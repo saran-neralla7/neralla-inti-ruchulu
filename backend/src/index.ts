@@ -180,7 +180,7 @@ app.get('/api/products/:id', async (req, res) => {
 
 // Create Product (Admin Only)
 app.post('/api/products', authenticateAdmin, async (req, res) => {
-  const { categoryId, name_en, name_te, description_en, description_te, ingredients, status, label, spice, gallery, inventory, variants } = req.body;
+  const { categoryId, name_en, name_te, description_en, description_te, ingredients, status, label, spice, gallery, inventory, variants, rating, reviewCount } = req.body;
   try {
     const product = await prisma.product.create({
       data: {
@@ -195,12 +195,15 @@ app.post('/api/products', authenticateAdmin, async (req, res) => {
         spice: spice || 'medium',
         gallery: gallery || [],
         inventory: Number(inventory) || 0,
+        rating: rating !== undefined ? Number(rating) : 4.5,
+        reviewCount: reviewCount !== undefined ? Number(reviewCount) : 10,
         variants: {
           create: (variants || []).map((v: any) => ({
             size: v.size,
             packaging: v.packaging,
             variantPrice: Number(v.variantPrice) || 0,
             packagingCharge: Number(v.packagingCharge) || 0,
+            costPrice: Number(v.costPrice) || 0,
           })),
         },
       },
@@ -216,7 +219,7 @@ app.post('/api/products', authenticateAdmin, async (req, res) => {
 // Update Product (Admin Only)
 app.put('/api/products/:id', authenticateAdmin, async (req, res) => {
   const id = req.params.id as string;
-  const { categoryId, name_en, name_te, description_en, description_te, ingredients, status, label, spice, gallery, inventory, variants } = req.body;
+  const { categoryId, name_en, name_te, description_en, description_te, ingredients, status, label, spice, gallery, inventory, variants, rating, reviewCount } = req.body;
   try {
     // Delete existing variants first
     await prisma.variant.deleteMany({ where: { productId: id } });
@@ -235,12 +238,15 @@ app.put('/api/products/:id', authenticateAdmin, async (req, res) => {
         spice: spice || 'medium',
         gallery: gallery || [],
         inventory: Number(inventory) || 0,
+        rating: rating !== undefined ? Number(rating) : 4.5,
+        reviewCount: reviewCount !== undefined ? Number(reviewCount) : 10,
         variants: {
           create: (variants || []).map((v: any) => ({
             size: v.size,
             packaging: v.packaging,
             variantPrice: Number(v.variantPrice) || 0,
             packagingCharge: Number(v.packagingCharge) || 0,
+            costPrice: Number(v.costPrice) || 0,
           })),
         },
       },
@@ -366,11 +372,15 @@ app.put('/api/orders/:id/approve', authenticateAdmin, async (req, res) => {
 // Update Order Status (Admin Only) — for approved orders
 app.put('/api/orders/:id/status', authenticateAdmin, async (req, res) => {
   const id = req.params.id as string;
-  const { status } = req.body;
+  const { status, actualShippingCost } = req.body;
   try {
+    const updateData: any = { status };
+    if (actualShippingCost !== undefined) {
+      updateData.actualShippingCost = Number(actualShippingCost) || 0;
+    }
     const order = await prisma.order.update({
       where: { id },
-      data: { status },
+      data: updateData,
       include: { items: true },
     });
     res.json(order);
@@ -621,6 +631,148 @@ app.delete('/api/testimonials/:id', authenticateAdmin, async (req, res) => {
     res.json({ success: true });
   } catch (error) { res.status(500).json({ error: 'Failed to delete testimonial' }); }
 });
+
+// ─── EXPENSES API ───
+app.get('/api/admin/expenses', authenticateAdmin, async (req, res) => {
+  try {
+    const expenses = await prisma.expense.findMany({
+      orderBy: { date: 'desc' },
+    });
+    res.json(expenses);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch expenses' });
+  }
+});
+
+app.post('/api/admin/expenses', authenticateAdmin, async (req, res) => {
+  const { amount, category, description, date } = req.body;
+  try {
+    const expense = await prisma.expense.create({
+      data: {
+        amount: Number(amount) || 0,
+        category: category || 'Other',
+        description: description || '',
+        date: date ? new Date(date) : new Date(),
+      },
+    });
+    res.json(expense);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create expense' });
+  }
+});
+
+app.delete('/api/admin/expenses/:id', authenticateAdmin, async (req, res) => {
+  const id = req.params.id as string;
+  try {
+    await prisma.expense.delete({
+      where: { id },
+    });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete expense' });
+  }
+});
+
+// ─── P&L REPORT API ───
+app.get('/api/admin/reports/profit-loss', authenticateAdmin, async (req, res) => {
+  const { startDate, endDate } = req.query;
+  try {
+    const dateFilter: any = {};
+    if (startDate || endDate) {
+      dateFilter.createdAt = {};
+      if (startDate) dateFilter.createdAt.gte = new Date(startDate as string);
+      if (endDate) dateFilter.createdAt.lte = new Date(endDate as string);
+    }
+
+    const settings = await prisma.setting.findUnique({ where: { id: '1' } });
+    const freeShippingLimit = settings?.free_shipping_limit ?? 999;
+    const defaultShippingCharge = settings?.shipping_charge ?? 80;
+
+    const orders = await prisma.order.findMany({
+      where: {
+        orderNumber: { not: null },
+        status: { notIn: ['Pending Approval', 'Cancelled'] },
+        ...dateFilter,
+      },
+      include: {
+        items: true,
+      },
+    });
+
+    const products = await prisma.product.findMany({
+      include: { variants: true },
+    });
+
+    const costMap: Record<string, number> = {};
+    products.forEach(p => {
+      p.variants.forEach(v => {
+        const key = `${p.name_en.toLowerCase()}|${v.size.toLowerCase()}|${v.packaging.toLowerCase()}`;
+        costMap[key] = v.costPrice;
+      });
+    });
+
+    let grossRevenue = 0;
+    let totalCogs = 0;
+    let shippingCollected = 0;
+    let totalActualShippingCost = 0;
+
+    orders.forEach(order => {
+      let orderProductTotal = 0;
+      order.items.forEach(item => {
+        const itemTotal = item.price * item.quantity;
+        orderProductTotal += itemTotal;
+
+        const key = `${item.productName_en.toLowerCase()}|${item.variantSize.toLowerCase()}|${item.variantPackaging.toLowerCase()}`;
+        const costPrice = costMap[key] ?? 0;
+        totalCogs += costPrice * item.quantity;
+      });
+
+      grossRevenue += orderProductTotal;
+      totalActualShippingCost += order.actualShippingCost ?? 0;
+
+      if (orderProductTotal < freeShippingLimit) {
+        shippingCollected += defaultShippingCharge;
+      }
+    });
+
+    const gatewayFeeRate = 0.02; // 2%
+    const totalInflow = grossRevenue + shippingCollected;
+    const gatewayFees = totalInflow * gatewayFeeRate;
+
+    const expenseFilter: any = {};
+    if (startDate || endDate) {
+      expenseFilter.date = {};
+      if (startDate) expenseFilter.date.gte = new Date(startDate as string);
+      if (endDate) expenseFilter.date.lte = new Date(endDate as string);
+    }
+    const expenses = await prisma.expense.findMany({
+      where: expenseFilter,
+    });
+
+    const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+    const netProfit = totalInflow - totalCogs - totalActualShippingCost - gatewayFees - totalExpenses;
+
+    res.json({
+      summary: {
+        grossRevenue,
+        shippingCollected,
+        totalInflow,
+        totalCogs,
+        totalActualShippingCost,
+        gatewayFees,
+        totalExpenses,
+        netProfit,
+        netProfitMargin: totalInflow > 0 ? (netProfit / totalInflow) * 100 : 0,
+      },
+      expenses,
+      ordersCount: orders.length,
+    });
+  } catch (error: any) {
+    console.error('Error generating P&L report:', error);
+    res.status(500).json({ error: 'Failed to generate P&L report', details: error.message });
+  }
+});
+
 
 if (process.env.NODE_ENV !== 'production') {
   app.listen(port, () => {

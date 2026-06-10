@@ -102,9 +102,11 @@ export function Products() {
       return new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime();
     }
     // 'popular' sorts by rating / reviews
-    const spiceA = getProductSpiceLevel(a.spice);
-    const spiceB = getProductSpiceLevel(b.spice);
-    return spiceB.rating * spiceB.reviews - spiceA.rating * spiceA.reviews;
+    const ratingA = a.rating ?? getProductSpiceLevel(a.spice).rating;
+    const reviewCountA = a.reviewCount ?? getProductSpiceLevel(a.spice).reviews;
+    const ratingB = b.rating ?? getProductSpiceLevel(b.spice).rating;
+    const reviewCountB = b.reviewCount ?? getProductSpiceLevel(b.spice).reviews;
+    return ratingB * reviewCountB - ratingA * reviewCountA;
   });
 
   const isLoading = productsLoading || categoriesLoading;

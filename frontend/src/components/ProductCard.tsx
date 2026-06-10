@@ -104,10 +104,10 @@ export function ProductCard({ product }: ProductCardProps) {
             {Array.from({ length: 5 }).map((_, idx) => (
               <Star
                 key={idx}
-                className={cn('h-3.5 w-3.5', idx < Math.floor(spiceInfo.rating) ? 'fill-current' : 'text-zinc-200')}
+                className={cn('h-3.5 w-3.5', idx < Math.floor(product.rating ?? spiceInfo.rating) ? 'fill-current' : 'text-zinc-200')}
               />
             ))}
-            <span className="text-[11px] text-muted-foreground ml-1 font-bold">({spiceInfo.reviews})</span>
+            <span className="text-[11px] text-muted-foreground ml-1 font-bold">({product.reviewCount ?? spiceInfo.reviews})</span>
           </div>
         </div>
 

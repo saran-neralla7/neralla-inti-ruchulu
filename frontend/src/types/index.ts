@@ -6,6 +6,7 @@ export interface Variant {
   packaging: string;
   variantPrice: number;
   packagingCharge: number;
+  costPrice?: number;
 }
 
 export interface Category {
@@ -28,6 +29,8 @@ export interface Product {
   spice: 'fire' | 'medium' | 'mild';
   gallery: string[];
   inventory: number;
+  rating?: number;
+  reviewCount?: number;
   category?: Category;
   variants: Variant[];
   createdAt?: string;

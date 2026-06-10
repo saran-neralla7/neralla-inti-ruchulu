@@ -202,12 +202,27 @@ export function AdminOrders() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const res = await api.put(`/orders/${id}/status`, { status });
+    mutationFn: async ({ id, status, actualShippingCost }: { id: string; status: string; actualShippingCost?: number }) => {
+      const res = await api.put(`/orders/${id}/status`, { status, actualShippingCost });
       return res.data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-orders'] }),
   });
+
+  const handleStatusChange = (order: Order, nextStatus: string) => {
+    if (nextStatus === 'Shipped' || nextStatus === 'Delivered') {
+      const collected = total(order) < 999 ? 80 : 0;
+      const val = window.prompt(
+        `Enter Actual Courier Shipping Cost paid to courier for order ${order.orderNumber} (Collected from customer: ₹${collected}):`,
+        collected.toString()
+      );
+      if (val === null) return;
+      const cost = parseFloat(val) || 0;
+      updateStatusMutation.mutate({ id: order.id, status: nextStatus, actualShippingCost: cost });
+    } else {
+      updateStatusMutation.mutate({ id: order.id, status: nextStatus });
+    }
+  };
 
   const deleteOrderMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -440,7 +455,7 @@ export function AdminOrders() {
                           <div className="relative inline-block">
                             <select
                               value={order.status}
-                              onChange={e => updateStatusMutation.mutate({ id: order.id, status: e.target.value })}
+                              onChange={e => handleStatusChange(order, e.target.value)}
                               className={cn(
                                 'text-xs font-semibold px-2 py-1 pr-6 rounded-full appearance-none cursor-pointer border-0 outline-none',
                                 STATUS_COLORS[order.status] || 'bg-muted text-muted-foreground'

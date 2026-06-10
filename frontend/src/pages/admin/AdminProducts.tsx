@@ -20,6 +20,7 @@ interface FormVariant {
   packaging: string;
   variantPrice: number;
   packagingCharge: number;
+  costPrice: number;
 }
 
 export function AdminProducts() {
@@ -39,9 +40,11 @@ export function AdminProducts() {
   const [label, setLabel] = useState('');
   const [spice, setSpice] = useState('medium');
   const [inventory, setInventory] = useState(0);
+  const [rating, setRating] = useState('4.5');
+  const [reviewCount, setReviewCount] = useState('10');
   const [imageUrl, setImageUrl] = useState('');
   const [variants, setVariants] = useState<FormVariant[]>([
-    { size: '250g', packaging: 'Bottle', variantPrice: 150, packagingCharge: 20 },
+    { size: '250g', packaging: 'Bottle', variantPrice: 150, packagingCharge: 20, costPrice: 60 },
   ]);
 
   // Temporary variant form state
@@ -49,6 +52,7 @@ export function AdminProducts() {
   const [newVarPkg, setNewVarPkg] = useState('Bottle');
   const [newVarPrice, setNewVarPrice] = useState(150);
   const [newVarCharge, setNewVarCharge] = useState(20);
+  const [newVarCost, setNewVarCost] = useState(60);
 
   // Fetch products
   const { data: products = [], isLoading: productsLoading } = useQuery<Product[]>({
@@ -136,8 +140,10 @@ export function AdminProducts() {
     setLabel('');
     setSpice('medium');
     setInventory(0);
+    setRating('4.5');
+    setReviewCount('10');
     setImageUrl('');
-    setVariants([{ size: '250g', packaging: 'Bottle', variantPrice: 150, packagingCharge: 20 }]);
+    setVariants([{ size: '250g', packaging: 'Bottle', variantPrice: 150, packagingCharge: 20, costPrice: 60 }]);
     setEditingId(null);
     setShowForm(false);
   };
@@ -154,6 +160,8 @@ export function AdminProducts() {
     setLabel(product.label || '');
     setSpice(product.spice || 'medium');
     setInventory(product.inventory);
+    setRating((product.rating ?? 4.5).toString());
+    setReviewCount((product.reviewCount ?? 10).toString());
     setImageUrl(product.gallery?.[0] || '');
     setVariants(
       product.variants.map((v) => ({
@@ -161,6 +169,7 @@ export function AdminProducts() {
         packaging: v.packaging,
         variantPrice: v.variantPrice,
         packagingCharge: v.packagingCharge,
+        costPrice: v.costPrice ?? 0,
       }))
     );
     setShowForm(true);
@@ -193,6 +202,7 @@ export function AdminProducts() {
         packaging: newVarPkg,
         variantPrice: Number(newVarPrice) || 0,
         packagingCharge: Number(newVarCharge) || 0,
+        costPrice: Number(newVarCost) || 0,
       },
     ]);
   };
@@ -221,6 +231,8 @@ export function AdminProducts() {
       label: label || null,
       spice,
       inventory: Number(inventory) || 0,
+      rating: Number(rating) || 4.5,
+      reviewCount: Number(reviewCount) || 10,
       gallery: imageUrl ? [imageUrl] : [],
       variants,
     };
@@ -392,6 +404,28 @@ export function AdminProducts() {
                 className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">Rating (0 - 5)</label>
+              <input
+                type="number"
+                min="0"
+                max="5"
+                step="0.1"
+                value={rating}
+                onChange={(e) => setRating(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">Review Count</label>
+              <input
+                type="number"
+                min="0"
+                value={reviewCount}
+                onChange={(e) => setReviewCount(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
             
             <div className="md:col-span-2 border-t border-border/30 pt-4 mt-2">
               <label className="text-sm font-medium text-foreground mb-2.5 block">Product Image</label>
@@ -464,6 +498,7 @@ export function AdminProducts() {
                     </span>
                     <span className="text-primary font-semibold">₹{v.variantPrice}</span>
                     <span className="text-muted-foreground">Charge: ₹{v.packagingCharge}</span>
+                    <span className="text-zinc-500 font-medium bg-zinc-100 px-1.5 py-0.5 rounded text-[11px]">Cost: ₹{v.costPrice}</span>
                   </div>
                   <button
                     type="button"
@@ -477,7 +512,7 @@ export function AdminProducts() {
             </div>
 
             {/* Add variant sub-form */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-3 border-t border-border/20">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3 pt-3 border-t border-border/20">
               <div>
                 <label className="text-xs text-muted-foreground block mb-1">Size</label>
                 <input
@@ -513,6 +548,15 @@ export function AdminProducts() {
                   type="number"
                   value={newVarCharge}
                   onChange={(e) => setNewVarCharge(Number(e.target.value))}
+                  className="w-full px-2 py-1 rounded border border-border text-xs bg-background"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Cost Price (₹)</label>
+                <input
+                  type="number"
+                  value={newVarCost}
+                  onChange={(e) => setNewVarCost(Number(e.target.value))}
                   className="w-full px-2 py-1 rounded border border-border text-xs bg-background"
                 />
               </div>

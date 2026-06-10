@@ -208,12 +208,12 @@ export function ProductDetail() {
                 {Array.from({ length: 5 }).map((_, idx) => (
                   <Star
                     key={idx}
-                    className={cn('h-4 w-4', idx < Math.floor(spiceInfo.rating) ? 'fill-current' : 'text-zinc-200')}
+                    className={cn('h-4 w-4', idx < Math.floor(product.rating ?? spiceInfo.rating) ? 'fill-current' : 'text-zinc-200')}
                   />
                 ))}
               </div>
-              <span className="text-xs font-bold text-foreground/80">{spiceInfo.rating}</span>
-              <span className="text-xs text-muted-foreground">({spiceInfo.reviews} {isTE ? 'సమీక్షలు' : 'customer reviews'})</span>
+              <span className="text-xs font-bold text-foreground/80">{product.rating ?? spiceInfo.rating}</span>
+              <span className="text-xs text-muted-foreground">({product.reviewCount ?? spiceInfo.reviews} {isTE ? 'సమీక్షలు' : 'customer reviews'})</span>
             </div>
 
             {product.description_en && (

@@ -18,6 +18,7 @@ import { AdminAnalytics } from './pages/admin/AdminAnalytics';
 import { AdminCustomers } from './pages/admin/AdminCustomers';
 import { AdminDeliveryZones } from './pages/admin/AdminDeliveryZones';
 import { AdminTestimonials } from './pages/admin/AdminTestimonials';
+import { AdminExpenses } from './pages/admin/AdminExpenses';
 import { GlobalModal } from './components/ui/GlobalModal';
 
 const queryClient = new QueryClient();
@@ -57,6 +58,7 @@ function App() {
             <Route path="customers" element={<AdminCustomers />} />
             <Route path="delivery-zones" element={<AdminDeliveryZones />} />
             <Route path="testimonials" element={<AdminTestimonials />} />
+            <Route path="expenses" element={<AdminExpenses />} />
             <Route path="settings" element={<AdminSettings />} />
           </Route>
         </Routes>

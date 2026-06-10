@@ -14,6 +14,7 @@ import {
   Users,
   MapPin,
   MessageSquare,
+  Wallet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -26,6 +27,7 @@ const navItems = [
   { to: '/admin/customers', icon: Users, label: 'Customers' },
   { to: '/admin/delivery-zones', icon: MapPin, label: 'Delivery Zones' },
   { to: '/admin/testimonials', icon: MessageSquare, label: 'Testimonials' },
+  { to: '/admin/expenses', icon: Wallet, label: 'Expenses' },
   { to: '/admin/settings', icon: Settings, label: 'Settings' },
 ];
 
