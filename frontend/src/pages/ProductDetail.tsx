@@ -287,7 +287,9 @@ export function ProductDetail() {
               </span>
               <span className="text-xs font-bold flex items-center gap-1.5 text-foreground/85">
                 <Clock className="h-4 w-4 text-primary" />
-                12 {isTE ? 'నెలలు' : 'Months'}
+                {product.shelfLife === '12 Months'
+                  ? (isTE ? '12 నెలలు' : '12 Months')
+                  : product.shelfLife || (isTE ? '12 నెలలు' : '12 Months')}
               </span>
             </div>
           </div>
@@ -415,27 +417,38 @@ export function ProductDetail() {
               {t('product.pure_handcrafted')}
             </div>
           </div>
-
+          
           {/* Storage instructions */}
           <div className="p-6 md:p-8 rounded-3xl border border-border/40 bg-background flex flex-col justify-center shadow-sm">
             <h3 className="font-headline font-bold text-xl text-primary mb-3 flex items-center gap-2">
               <ShieldCheck className="h-5 w-5" />
               {t('product.storage')}
             </h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li className="flex gap-2">
-                <span className="text-primary">•</span> 
-                {isTE ? 'సూర్యరశ్మి తగలని చల్లని, పొడి ప్రదేశంలో నిల్వ చేయండి.' : 'Store in a cool, dry place away from direct sunlight.'}
-              </li>
-              <li className="flex gap-2">
-                <span className="text-primary">•</span> 
-                {isTE ? 'పచ్చడి తీయడానికి ఎల్లప్పుడూ పొడి చెంచాను వాడండి.' : 'Always use a dry spoon to serve.'}
-              </li>
-              <li className="flex gap-2">
-                <span className="text-primary">•</span> 
-                {isTE ? 'ఎక్కువ కాలం నిల్వ ఉండటానికి పైన నూనె తేలేలా చూసుకోండి.' : 'Keep the oil layer floating on top for longer shelf life.'}
-              </li>
-            </ul>
+            {product.storage ? (
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                {product.storage.split('\n').filter(line => line.trim().length > 0).map((line, idx) => (
+                  <li key={idx} className="flex gap-2">
+                    <span className="text-primary">•</span>
+                    {line.trim()}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex gap-2">
+                  <span className="text-primary">•</span> 
+                  {isTE ? 'సూర్యరశ్మి తగలని చల్లని, పొడి ప్రదేశంలో నిల్వ చేయండి.' : 'Store in a cool, dry place away from direct sunlight.'}
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-primary">•</span> 
+                  {isTE ? 'పచ్చడి తీయడానికి ఎల్లప్పుడూ పొడి చెంచాను వాడండి.' : 'Always use a dry spoon to serve.'}
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-primary">•</span> 
+                  {isTE ? 'ఎక్కువ కాలం నిల్వ ఉండటానికి పైన నూనె తేలేలా చూసుకోండి.' : 'Keep the oil layer floating on top for longer shelf life.'}
+                </li>
+              </ul>
+            )}
           </div>
         </div>
       </div>

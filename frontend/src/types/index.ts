@@ -24,6 +24,8 @@ export interface Product {
   description_en?: string;
   description_te?: string;
   ingredients?: string;
+  storage?: string;
+  shelfLife?: string;
   status: 'Available' | 'Out Of Stock' | 'Coming Soon' | 'Seasonal';
   label?: string;
   spice: 'fire' | 'medium' | 'mild';

@@ -33,6 +33,8 @@ model Product {
   description_en      String?
   description_te      String?
   ingredients         String?
+  storage             String?
+  shelfLife           String    @default("12 Months")
   status              String    @default("Available")
   label               String?
   spice               String    @default("medium")

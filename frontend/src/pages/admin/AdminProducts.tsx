@@ -35,6 +35,8 @@ export function AdminProducts() {
   const [descEN, setDescEN] = useState('');
   const [descTE, setDescTE] = useState('');
   const [ingredients, setIngredients] = useState('');
+  const [storage, setStorage] = useState('');
+  const [shelfLife, setShelfLife] = useState('12 Months');
   const [categoryId, setCategoryId] = useState('');
   const [status, setStatus] = useState('Available');
   const [label, setLabel] = useState('');
@@ -135,6 +137,8 @@ export function AdminProducts() {
     setDescEN('');
     setDescTE('');
     setIngredients('');
+    setStorage('');
+    setShelfLife('12 Months');
     setCategoryId('');
     setStatus('Available');
     setLabel('');
@@ -155,6 +159,8 @@ export function AdminProducts() {
     setDescEN(product.description_en || '');
     setDescTE(product.description_te || '');
     setIngredients(product.ingredients || '');
+    setStorage(product.storage || '');
+    setShelfLife(product.shelfLife || '12 Months');
     setCategoryId(product.categoryId);
     setStatus(product.status);
     setLabel(product.label || '');
@@ -227,6 +233,8 @@ export function AdminProducts() {
       description_en: descEN,
       description_te: descTE,
       ingredients,
+      storage,
+      shelfLife,
       status,
       label: label || null,
       spice,
@@ -341,6 +349,16 @@ export function AdminProducts() {
               />
             </div>
             <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">Shelf Life</label>
+              <input
+                type="text"
+                value={shelfLife}
+                onChange={(e) => setShelfLife(e.target.value)}
+                placeholder="e.g. 12 Months"
+                className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            <div>
               <label className="text-sm font-medium text-foreground mb-1 block">Category</label>
               <select
                 value={categoryId}
@@ -423,6 +441,17 @@ export function AdminProducts() {
                 min="0"
                 value={reviewCount}
                 onChange={(e) => setReviewCount(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            
+            <div className="md:col-span-2">
+              <label className="text-sm font-medium text-foreground mb-1 block">Storage Instructions</label>
+              <textarea
+                value={storage}
+                onChange={(e) => setStorage(e.target.value)}
+                placeholder="e.g. Store in a cool, dry place... (use newlines for separate instructions)"
+                rows={3}
                 className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
