@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Admin {
+  id            String   @id @default(cuid())
+  username      String   @unique
+  password_hash String
+  role          String   @default("Admin")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  name_en   String
+  name_te   String
+  order     Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
+}
+
+model Product {
+  id                  String    @id @default(cuid())
+  categoryId          String
+  name_en             String
+  name_te             String
+  description_en      String?
+  description_te      String?
+  ingredients         String?
+  status              String    @default("Available")
+  label               String?
+  gallery             String[]
+  inventory           Int       @default(0)
+  low_stock_threshold Int       @default(10)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  category            Category  @relation(fields: [categoryId], references: [id])
+  variants            Variant[]
+}
+
+model Variant {
+  id              String  @id @default(cuid())
+  productId       String
+  size            String
+  packaging       String
+  variantPrice    Float
+  packagingCharge Float   @default(0)
+  product         Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  orderNumber     String?     @unique
+  customerName    String
+  customerPhone   String
+  customerAddress String?
+  whatsappMessage String?
+  status          String      @default("Pending Approval")
+  adminNotes      String?
+  approvedAt      DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  items           OrderItem[]
+}
+
+model OrderItem {
+  id               String @id @default(cuid())
+  orderId          String
+  productName_en   String
+  productName_te   String
+  variantSize      String
+  variantPackaging String
+  quantity         Int
+  price            Float
+  order            Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model Setting {
+  id                  String   @id @default("1")
+  business_name       String   @default("Neralla Inti Ruchulu")
+  whatsapp_number     String   @default("8247843466")
+  free_shipping_limit Float    @default(999)
+  shipping_charge     Float    @default(0)
+  instagram_link      String?
+  facebook_link       String?
+  youtube_link        String?
+  address             String?
+  business_hours      String?
+  business_open_time  String?
+  business_close_time String?
+  business_days       String?  @default("Mon,Tue,Wed,Thu,Fri,Sat")
+  updatedAt           DateTime @updatedAt
+}
+
+model DeliveryZone {
+  id              String   @id @default(cuid())
+  name            String
+  pincode         String
+  delivery_charge Float    @default(0)
+  is_active       Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Testimonial {
+  id            String   @id @default(cuid())
+  customer_name String
+  location      String?
+  text          String
+  rating        Int      @default(5)
+  is_active     Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}

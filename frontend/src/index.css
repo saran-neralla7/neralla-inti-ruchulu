@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #fdfbf7; /* Warm Cream from Logo Background */
+    --foreground: #2b1c1a;
+    
+    --card: #ffffff;
+    --card-foreground: #2b1c1a;
+    
+    --popover: #ffffff;
+    --popover-foreground: #2b1c1a;
+    
+    --primary: #3c1611; /* Deep Maroon/Brown from "Neralla" Text */
+    --primary-foreground: #ffffff;
+    
+    --secondary: #0b4d2c; /* Forest Green from "Ruchulu" Text */
+    --secondary-foreground: #ffffff;
+    
+    --muted: #f7edea;
+    --muted-foreground: #6b5754;
+    
+    --accent: #be1e18; /* Chilli Red from Logo Chillies */
+    --accent-foreground: #ffffff;
+    
+    --destructive: #be1e18;
+    --destructive-foreground: #ffffff;
+    
+    --border: #e8dbd7; /* Warm Clay Beige */
+    --input: #e8dbd7;
+    --ring: #3c1611;
+    
+    --radius: 1rem;
+  }
+
+  .dark {
+    --background: #17100f;
+    --foreground: #f7edea;
+    
+    --card: #211918;
+    --card-foreground: #f7edea;
+    
+    --popover: #211918;
+    --popover-foreground: #f7edea;
+    
+    --primary: #5c241c;
+    --primary-foreground: #ffffff;
+    
+    --secondary: #10663c;
+    --secondary-foreground: #f7edea;
+    
+    --muted: #2d1f1d;
+    --muted-foreground: #a3908e;
+    
+    --accent: #be1e18;
+    --accent-foreground: #ffffff;
+    
+    --destructive: #be1e18;
+    --destructive-foreground: #ffffff;
+    
+    --border: #3b2825;
+    --input: #3b2825;
+    --ring: #5c241c;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+}
