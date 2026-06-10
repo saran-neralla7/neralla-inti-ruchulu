@@ -197,7 +197,8 @@ app.post('/api/products', authenticateAdmin, async (req, res) => {
         res.json(product);
     }
     catch (error) {
-        res.status(500).json({ error: 'Failed to create product' });
+        console.error('Create product error:', error);
+        res.status(500).json({ error: 'Failed to create product', details: error.message || String(error), stack: error.stack });
     }
 });
 // Update Product (Admin Only)
@@ -235,7 +236,8 @@ app.put('/api/products/:id', authenticateAdmin, async (req, res) => {
         res.json(product);
     }
     catch (error) {
-        res.status(500).json({ error: 'Failed to update product' });
+        console.error('Update product error:', error);
+        res.status(500).json({ error: 'Failed to update product', details: error.message || String(error), stack: error.stack });
     }
 });
 // Delete Product (Admin Only)
