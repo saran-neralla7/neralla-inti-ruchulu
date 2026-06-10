@@ -38,7 +38,7 @@ export function AdminProducts() {
   const [status, setStatus] = useState('Available');
   const [label, setLabel] = useState('');
   const [inventory, setInventory] = useState(0);
-  const [gallery, setGallery] = useState<string[]>([]);
+  const [imageUrl, setImageUrl] = useState('');
   const [variants, setVariants] = useState<FormVariant[]>([
     { size: '250g', packaging: 'Bottle', variantPrice: 150, packagingCharge: 20 },
   ]);
@@ -120,7 +120,7 @@ export function AdminProducts() {
     setStatus('Available');
     setLabel('');
     setInventory(0);
-    setGallery([]);
+    setImageUrl('');
     setVariants([{ size: '250g', packaging: 'Bottle', variantPrice: 150, packagingCharge: 20 }]);
     setEditingId(null);
     setShowForm(false);
@@ -137,7 +137,7 @@ export function AdminProducts() {
     setStatus(product.status);
     setLabel(product.label || '');
     setInventory(product.inventory);
-    setGallery(product.gallery);
+    setImageUrl(product.gallery?.[0] || '');
     setVariants(
       product.variants.map((v) => ({
         size: v.size,
@@ -147,6 +147,25 @@ export function AdminProducts() {
       }))
     );
     setShowForm(true);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      showAlert({
+        title: 'File Too Large',
+        description: 'Please select an image smaller than 2MB to ensure good performance.',
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImageUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleAddVariant = () => {
@@ -184,7 +203,7 @@ export function AdminProducts() {
       status,
       label: label || null,
       inventory: Number(inventory) || 0,
-      gallery,
+      gallery: imageUrl ? [imageUrl] : [],
       variants,
     };
 
@@ -342,6 +361,59 @@ export function AdminProducts() {
                 onChange={(e) => setInventory(Number(e.target.value))}
                 className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
+            </div>
+            
+            <div className="md:col-span-2 border-t border-border/30 pt-4 mt-2">
+              <label className="text-sm font-medium text-foreground mb-2.5 block">Product Image</label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                <div className="md:col-span-2 space-y-3">
+                  <input
+                    type="text"
+                    value={imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                    placeholder="Paste image URL (e.g. https://images.unsplash.com/photo-...) or choose a file below"
+                    className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                  <div className="flex items-center gap-3">
+                    <label className="cursor-pointer inline-flex items-center gap-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors border border-border/50">
+                      <span>Choose File / Upload Image</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    {imageUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setImageUrl('')}
+                        className="text-xs text-destructive hover:underline font-semibold"
+                      >
+                        Clear Image
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-center md:justify-start">
+                  <div className="relative w-24 h-24 border border-border/85 rounded-xl overflow-hidden bg-muted flex items-center justify-center shadow-inner">
+                    {imageUrl ? (
+                      <img
+                        src={imageUrl}
+                        alt="Product Preview"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://placehold.co/150x150?text=Invalid+URL';
+                        }}
+                      />
+                    ) : (
+                      <div className="text-center p-2">
+                        <span className="text-[10px] text-muted-foreground block font-medium">No Image</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
