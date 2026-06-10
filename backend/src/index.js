@@ -749,13 +749,10 @@ app.get('/api/admin/reports/profit-loss', authenticateAdmin, async (req, res) =>
             });
             grossRevenue += orderProductTotal;
             totalActualShippingCost += order.actualShippingCost ?? 0;
-            if (orderProductTotal < freeShippingLimit) {
-                shippingCollected += defaultShippingCharge;
-            }
+            // Shipping collected is 0 since we don't charge shipping on the PWA storefront checkout
         });
-        const gatewayFeeRate = 0.02; // 2%
         const totalInflow = grossRevenue + shippingCollected;
-        const gatewayFees = totalInflow * gatewayFeeRate;
+        const gatewayFees = 0; // Removed gateway charges for now as requested by user
         const expenseFilter = {};
         if (startDate || endDate) {
             expenseFilter.date = {};
