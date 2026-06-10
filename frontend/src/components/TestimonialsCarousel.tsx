@@ -3,7 +3,7 @@ import useEmblaCarousel from 'embla-carousel-react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useTranslation } from 'react-i18next';
-import { Star, ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react';
+import { Star, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface Testimonial {
   id: string;
