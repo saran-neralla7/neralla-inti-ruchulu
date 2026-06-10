@@ -21,12 +21,13 @@ export function CartSidebar({ open, onClose }: CartSidebarProps) {
   const { items, removeItem, updateQuantity, totalItems, totalPrice } = useCartStore();
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
   const [loading, setLoading] = useState(false);
 
   const isTE = i18n.language === 'te';
 
   const handleWhatsAppCheckout = async () => {
-    if (!customerName || !customerPhone) return;
+    if (!customerName || !customerPhone || !customerAddress) return;
     setLoading(true);
 
     const itemLines = items
@@ -41,6 +42,7 @@ export function CartSidebar({ open, onClose }: CartSidebarProps) {
       ``,
       `👤 *Name:* ${customerName}`,
       `📞 *Phone:* ${customerPhone}`,
+      `📍 *Address:* ${customerAddress}`,
       ``,
       `*Items:*`,
       itemLines,
@@ -53,7 +55,7 @@ export function CartSidebar({ open, onClose }: CartSidebarProps) {
       await api.post('/orders', {
         customerName,
         customerPhone,
-        customerAddress: 'WhatsApp Checkout',
+        customerAddress,
         whatsappMessage: message,
         items: items.map((item) => ({
           name_en: item.name_en,
@@ -73,6 +75,7 @@ export function CartSidebar({ open, onClose }: CartSidebarProps) {
       useCartStore.getState().clearCart();
       setCustomerName('');
       setCustomerPhone('');
+      setCustomerAddress('');
       onClose();
       navigate('/order-success');
     } catch (error) {
@@ -174,11 +177,18 @@ export function CartSidebar({ open, onClose }: CartSidebarProps) {
                 onChange={(e) => setCustomerPhone(e.target.value)}
                 className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
+              <textarea
+                placeholder="Delivery Address *"
+                value={customerAddress}
+                onChange={(e) => setCustomerAddress(e.target.value)}
+                rows={2}
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+              />
             </div>
             <Button
               className="w-full bg-green-600 hover:bg-green-700 text-white rounded-xl h-12 text-base font-semibold gap-2 shadow-lg shadow-green-600/20"
               onClick={handleWhatsAppCheckout}
-              disabled={!customerName || !customerPhone || loading}
+              disabled={!customerName || !customerPhone || !customerAddress || loading}
             >
               {loading ? (
                 <span>Processing Order...</span>
