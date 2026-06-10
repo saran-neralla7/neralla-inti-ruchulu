@@ -78,6 +78,13 @@ export function AdminProducts() {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       resetForm();
     },
+    onError: (err: any) => {
+      console.error('Create product mutation error:', err);
+      showAlert({
+        title: 'Save Failed',
+        description: err.response?.data?.details || err.response?.data?.error || err.message || 'Failed to save product.',
+      });
+    },
   });
 
   const updateMutation = useMutation({
@@ -88,6 +95,13 @@ export function AdminProducts() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       resetForm();
+    },
+    onError: (err: any) => {
+      console.error('Update product mutation error:', err);
+      showAlert({
+        title: 'Update Failed',
+        description: err.response?.data?.details || err.response?.data?.error || err.message || 'Failed to update product.',
+      });
     },
   });
 
