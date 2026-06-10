@@ -7,7 +7,20 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import crypto from 'crypto';
 dotenv.config();
 const app = express();
-const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/nir_db';
+function getPoolerConnectionString(url) {
+    if (url.includes('db.tszdohiultzzvqhebwsq.supabase.co')) {
+        const match = url.match(/postgresql:\/\/([^:]+):([^@]+)@db\.tszdohiultzzvqhebwsq\.supabase\.co:5432\/(.+)/);
+        if (match) {
+            const [, user, password, db] = match;
+            const formatted = `postgresql://${user}.tszdohiultzzvqhebwsq:${password}@aws-1-ap-northeast-1.pooler.supabase.com:6543/${db}?pgbouncer=true`;
+            console.log('Rewrote connection string to pooler URL');
+            return formatted;
+        }
+    }
+    return url;
+}
+const rawConnectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/nir_db';
+const connectionString = getPoolerConnectionString(rawConnectionString);
 const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
@@ -65,7 +78,8 @@ app.post('/api/admin/login', async (req, res) => {
         });
     }
     catch (error) {
-        res.status(500).json({ error: 'Login failed' });
+        console.error('Login error:', error);
+        res.status(500).json({ error: 'Login failed', details: error.message || String(error), stack: error.stack });
     }
 });
 // ─── CATEGORIES API ───
