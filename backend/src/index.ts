@@ -73,8 +73,9 @@ app.post('/api/admin/login', async (req, res) => {
         role: admin.role,
       },
     });
-  } catch (error) {
-    res.status(500).json({ error: 'Login failed' });
+  } catch (error: any) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Login failed', details: error.message || String(error), stack: error.stack });
   }
 });
 
