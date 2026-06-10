@@ -24,7 +24,7 @@ export function ProductCard({ product }: ProductCardProps) {
   const variant = product.variants[selectedVariantIndex];
   const isAvailable = product.status === 'Available';
 
-  const spiceInfo = getProductSpiceLevel(product.name_en);
+  const spiceInfo = getProductSpiceLevel(product.spice);
 
   const handleAddToCart = () => {
     if (!variant || !isAvailable) return;

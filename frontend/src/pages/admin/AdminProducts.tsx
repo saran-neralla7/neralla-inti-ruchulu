@@ -37,6 +37,7 @@ export function AdminProducts() {
   const [categoryId, setCategoryId] = useState('');
   const [status, setStatus] = useState('Available');
   const [label, setLabel] = useState('');
+  const [spice, setSpice] = useState('medium');
   const [inventory, setInventory] = useState(0);
   const [imageUrl, setImageUrl] = useState('');
   const [variants, setVariants] = useState<FormVariant[]>([
@@ -119,6 +120,7 @@ export function AdminProducts() {
     setCategoryId('');
     setStatus('Available');
     setLabel('');
+    setSpice('medium');
     setInventory(0);
     setImageUrl('');
     setVariants([{ size: '250g', packaging: 'Bottle', variantPrice: 150, packagingCharge: 20 }]);
@@ -136,6 +138,7 @@ export function AdminProducts() {
     setCategoryId(product.categoryId);
     setStatus(product.status);
     setLabel(product.label || '');
+    setSpice(product.spice || 'medium');
     setInventory(product.inventory);
     setImageUrl(product.gallery?.[0] || '');
     setVariants(
@@ -202,6 +205,7 @@ export function AdminProducts() {
       ingredients,
       status,
       label: label || null,
+      spice,
       inventory: Number(inventory) || 0,
       gallery: imageUrl ? [imageUrl] : [],
       variants,
@@ -351,6 +355,18 @@ export function AdminProducts() {
                     {l}
                   </option>
                 ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">Spice Level</label>
+              <select
+                value={spice}
+                onChange={(e) => setSpice(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="mild">Mild / Sweet (కారం తక్కువ / తీపి)</option>
+                <option value="medium">Medium Spicy (మధ్యమ కారం)</option>
+                <option value="fire">Andhra Fire - High (ఆంధ్రా ఫైర్ - కారం ఎక్కువ)</option>
               </select>
             </div>
             <div>

@@ -87,7 +87,7 @@ export function ProductDetail() {
 
   const isAvailable = product.status === 'Available';
   const name = isTE ? product.name_te : product.name_en;
-  const spiceInfo = getProductSpiceLevel(product.name_en);
+  const spiceInfo = getProductSpiceLevel(product.spice);
 
   const handleAddToCart = () => {
     if (!activeVariant || !isAvailable) return;

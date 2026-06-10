@@ -5,9 +5,9 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function getProductSpiceLevel(name: string) {
-  const n = name.toLowerCase();
-  if (n.includes('avakaya') || n.includes('mango') || n.includes('chicken') || n.includes('gongura')) {
+export function getProductSpiceLevel(spiceKey: string) {
+  const s = (spiceKey || '').toLowerCase();
+  if (s === 'fire' || s === 'high') {
     return {
       labelEn: 'ANDHRA FIRE (HIGH)',
       labelTe: 'ఆంధ్రా ఫైర్ (కారం ఎక్కువ)',
@@ -16,7 +16,7 @@ export function getProductSpiceLevel(name: string) {
       rating: 5,
       reviews: 128
     };
-  } else if (n.includes('tomato') || n.includes('kandi') || n.includes('podi') || n.includes('dal')) {
+  } else if (s === 'medium') {
     return {
       labelEn: 'MEDIUM SPICY',
       labelTe: 'మధ్యమ కారం',

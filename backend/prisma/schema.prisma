@@ -35,6 +35,7 @@ model Product {
   ingredients         String?
   status              String    @default("Available")
   label               String?
+  spice               String    @default("medium")
   gallery             String[]
   inventory           Int       @default(0)
   low_stock_threshold Int       @default(10)

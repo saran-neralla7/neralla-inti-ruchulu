@@ -80,7 +80,7 @@ export function Products() {
       (p.description_en?.toLowerCase().includes(q) ?? false);
 
     // 3. Spice Level Filter
-    const spiceInfo = getProductSpiceLevel(p.name_en);
+    const spiceInfo = getProductSpiceLevel(p.spice);
     const matchesSpice = selectedSpice.length === 0 || selectedSpice.includes(spiceInfo.key);
 
     // 4. Price range filter
@@ -102,8 +102,8 @@ export function Products() {
       return new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime();
     }
     // 'popular' sorts by rating / reviews
-    const spiceA = getProductSpiceLevel(a.name_en);
-    const spiceB = getProductSpiceLevel(b.name_en);
+    const spiceA = getProductSpiceLevel(a.spice);
+    const spiceB = getProductSpiceLevel(b.spice);
     return spiceB.rating * spiceB.reviews - spiceA.rating * spiceA.reviews;
   });
 

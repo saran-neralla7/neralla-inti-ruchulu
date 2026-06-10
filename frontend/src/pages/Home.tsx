@@ -15,7 +15,7 @@ const FEATURED_FALLBACK: Product[] = [
     name_en: 'Avakaya (Raw Mango Pickle)', name_te: 'అవకాయ',
     description_en: 'Traditional spicy Andhra raw mango pickle, sun-dried with sesame oil.',
     description_te: 'సాంప్రదాయ ఆంధ్ర ముతక మామిడికాయ పచ్చడి, నువ్వుల నూనెతో.',
-    status: 'Available', label: 'Bestseller', gallery: [], inventory: 50,
+    status: 'Available', label: 'Bestseller', spice: 'fire', gallery: [], inventory: 50,
     variants: [
       { id: 'v1a', productId: 'p1', size: '250g', packaging: 'Bottle', variantPrice: 120, packagingCharge: 20 },
       { id: 'v1b', productId: 'p1', size: '500g', packaging: 'Bottle', variantPrice: 220, packagingCharge: 20 },
@@ -27,7 +27,7 @@ const FEATURED_FALLBACK: Product[] = [
     name_en: 'Gongura (Sorrel Leaves Pickle)', name_te: 'గోంగూర పచ్చడి',
     description_en: 'Sour and tangy sorrel leaves pickle — an Andhra classic.',
     description_te: 'పులుపు గోంగూర పచ్చడి — ఆంధ్ర సాంప్రదాయం.',
-    status: 'Available', label: 'New Arrival', gallery: [], inventory: 30,
+    status: 'Available', label: 'New Arrival', spice: 'fire', gallery: [], inventory: 30,
     variants: [{ id: 'v2a', productId: 'p2', size: '250g', packaging: 'Bottle', variantPrice: 130, packagingCharge: 20 }],
   },
   {
@@ -35,7 +35,7 @@ const FEATURED_FALLBACK: Product[] = [
     name_en: 'Kandi Podi (Toor Dal Powder)', name_te: 'కంది పొడి',
     description_en: 'Aromatic toor dal powder, perfect with hot rice and ghee.',
     description_te: 'సుగంధ కంది పొడి, వేడి అన్నం మరియు నెయ్యితో చాలా రుచిగా ఉంటుంది.',
-    status: 'Available', label: 'Bestseller', gallery: [], inventory: 40,
+    status: 'Available', label: 'Bestseller', spice: 'medium', gallery: [], inventory: 40,
     variants: [{ id: 'v3a', productId: 'p3', size: '200g', packaging: 'Packet', variantPrice: 80, packagingCharge: 10 }],
   },
 ];

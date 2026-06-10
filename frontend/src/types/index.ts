@@ -25,6 +25,7 @@ export interface Product {
   ingredients?: string;
   status: 'Available' | 'Out Of Stock' | 'Coming Soon' | 'Seasonal';
   label?: string;
+  spice: 'fire' | 'medium' | 'mild';
   gallery: string[];
   inventory: number;
   category?: Category;

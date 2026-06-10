@@ -179,7 +179,7 @@ app.get('/api/products/:id', async (req, res) => {
 
 // Create Product (Admin Only)
 app.post('/api/products', authenticateAdmin, async (req, res) => {
-  const { categoryId, name_en, name_te, description_en, description_te, ingredients, status, label, gallery, inventory, variants } = req.body;
+  const { categoryId, name_en, name_te, description_en, description_te, ingredients, status, label, spice, gallery, inventory, variants } = req.body;
   try {
     const product = await prisma.product.create({
       data: {
@@ -191,6 +191,7 @@ app.post('/api/products', authenticateAdmin, async (req, res) => {
         ingredients,
         status: status || 'Available',
         label,
+        spice: spice || 'medium',
         gallery: gallery || [],
         inventory: Number(inventory) || 0,
         variants: {
@@ -213,7 +214,7 @@ app.post('/api/products', authenticateAdmin, async (req, res) => {
 // Update Product (Admin Only)
 app.put('/api/products/:id', authenticateAdmin, async (req, res) => {
   const id = req.params.id as string;
-  const { categoryId, name_en, name_te, description_en, description_te, ingredients, status, label, gallery, inventory, variants } = req.body;
+  const { categoryId, name_en, name_te, description_en, description_te, ingredients, status, label, spice, gallery, inventory, variants } = req.body;
   try {
     // Delete existing variants first
     await prisma.variant.deleteMany({ where: { productId: id } });
@@ -229,6 +230,7 @@ app.put('/api/products/:id', authenticateAdmin, async (req, res) => {
         ingredients,
         status,
         label,
+        spice: spice || 'medium',
         gallery: gallery || [],
         inventory: Number(inventory) || 0,
         variants: {
