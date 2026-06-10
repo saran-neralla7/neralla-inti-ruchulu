@@ -222,7 +222,7 @@ export function Home() {
               src="/heritage-kitchen-pickles.png"
             />
             <div className="absolute -bottom-6 -right-6 bg-white p-6 shadow-xl rounded-xl z-20 border border-primary/10">
-              <p className="font-headline text-primary text-2xl font-bold">Since 1974</p>
+              <p className="font-headline text-primary text-2xl font-bold">Since 1960's</p>
               <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Three Generations of Taste</p>
             </div>
           </div>

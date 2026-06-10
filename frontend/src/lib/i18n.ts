@@ -13,11 +13,11 @@ const resources = {
       "hero.cta": "Shop Now",
       
       // Heritage Page
-      "heritage.since": "Since 1954",
+      "heritage.since": "Since 1960's",
       "heritage.title": "Our Legacy of Spices",
       "heritage.subtitle": "Rooted in the sun-drenched coastal plains of Andhra Pradesh, our story began in a small family kitchen in MVP Colony. Today, we carry forward the whispers of our ancestors through every jar of authentic pickle and spice blend.",
       "heritage.sec1_title": "The Grandmother's Hands",
-      "heritage.sec1_p1": "It was in the summer of 1954 that Smt. Neralla first began preparing her signature 'Avakaya' for neighbors. What started as a labor of love for family quickly grew into a community staple, as the secret of her unique blend of Guntur chilies and cold-pressed sesame oil traveled through the streets of Visakhapatnam.",
+      "heritage.sec1_p1": "It was in the days back in the 1960's that Smt. Neralla first began preparing her signature 'Avakaya' for neighbors. What started as a labor of love for family quickly grew into a community staple, as the secret of her unique blend of Guntur chilies and cold-pressed sesame oil traveled through the streets of Visakhapatnam.",
       "heritage.sec1_p2": "Every ingredient is still sourced from the same small-scale farmers our family has trusted for three generations. We believe that authenticity isn't just about the recipe—it's about the relationship between the earth, the hand, and the jar.",
       "heritage.bento_title": "From Earth to Soul",
       "heritage.bento_desc": "A visual journey of our meticulous hand-packing process and sun-dried ingredients.",
@@ -67,11 +67,11 @@ const resources = {
       "hero.cta": "ఇప్పుడే కొనండి",
 
       // Heritage Page
-      "heritage.since": "1954 నుండి",
+      "heritage.since": "1960ల నుండి",
       "heritage.title": "మా సుగంధ ద్రవ్యాల వారసత్వం",
       "heritage.subtitle": "ఆంధ్రప్రదేశ్ తీరప్రాంత మైదానాల్లో వేర్లు వేసుకున్న మా కథ, MVP కాలనీలోని ఒక చిన్న కుటుంబ వంటగదిలో ప్రారంభమైంది. నేడు మా పూర్వీకుల సాంప్రదాయ పద్ధతులతో ప్రతి పచ్చడి సీసాను తయారుచేస్తున్నాము.",
       "heritage.sec1_title": "అమ్మమ్మ చేతి వంట",
-      "heritage.sec1_p1": "1954 వేసవిలో శ్రీమతి నేరెళ్ల గారు తన ప్రత్యేకమైన 'ఆవకాయ'ను ఇరుగుపొరుగు వారికి తయారుచేయడం ప్రారంభించారు. అది క్రమంగా విశాఖపట్నం అంతటా ప్రాచుర్యం పొందింది.",
+      "heritage.sec1_p1": "1960లలో శ్రీమతి నేరెళ్ల గారు తన ప్రత్యేకమైన 'ఆవకాయ'ను ఇరుగుపొరుగు వారికి తయారుచేయడం ప్రారంభించారు. అది క్రమంగా విశాఖపట్నం అంతటా ప్రాచుర్యం పొందింది.",
       "heritage.sec1_p2": "మా వంటకాల్లో ఉపయోగించే ప్రతి పదార్ధాన్ని మూడు తరాలుగా మేము నమ్ముతున్న స్థానిక రైతుల నుండే సేకరిస్తున్నాము. విశ్వసనీయత అనేది వంటకంలో మాత్రమే కాదు — నేల, చేయి మరియు జాడీ మధ్య ఉన్న అనుబంధంలో ఉంటుంది.",
       "heritage.bento_title": "నేల నుండి ఆత్మ వరకు",
       "heritage.bento_desc": "మా చేతితో ప్యాక్ చేసే విధానం మరియు సహజంగా ఎండబెట్టిన పదార్ధాల దృశ్య ప్రయాణం.",

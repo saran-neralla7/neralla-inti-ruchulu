@@ -39,15 +39,15 @@ export function About() {
           <div className="relative flex justify-center items-center">
             <div className="w-[85%] aspect-[4/5] bg-muted rounded-2xl overflow-hidden shadow-xl border border-border/50 rotate-[-2deg] transition-transform duration-500 hover:rotate-0">
               <img
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuD4GH4Lv-RzPqhanRMT6USZzdc7laClUnEPl9E5hRKu2gy5loZxCDRfXZAxzEz1gugQzDiyY5Z2KZUKMgJM7A96X7AsJquel9q5-OvchACvgv2dIMZQoGJum8ju2uzl9BkdF_qYtX2p_IzFEEjh_hS4uzTPPBtfu8WRCDCzq2UYfwjbjRJf-Z8f5o5HI1_JVyLB0lj1bNiiuIO1H-wbYgxfCkzEFPvfKgy_4hwYIpp7gTEZCvyHwNjQ1fm3UcJgB5yb9H6nICEfJPZ_"
+                src="/grandma_purple.jpg"
                 alt="Grandmother mixing spices"
                 className="w-full h-full object-cover filter sepia-[0.2] contrast-[1.1] brightness-[0.95]"
               />
             </div>
             <div className="absolute bottom-[-20px] right-2 w-[45%] aspect-square bg-background rounded-xl border-4 border-background shadow-2xl rotate-[5deg] overflow-hidden hidden md:block transition-transform duration-500 hover:rotate-0">
               <img
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuBCKP8m8goSx22q9hC2-ariOzHpFXqsyIfB0-46C-og85-hne_feUlgUQtl1V00gS1AU8GPqI0orQ0L9v-GZMG1pKWLIKDM5qmi11wgIIxzXyrZmxi5lfpAU87NXJmGfgGFzIQdf0pjpZ-f6mV3jgK7en3kAYLcGVpknQJcdcF7jeKoFiONKs-6MDpBYqA1FeXtlyQseijnEAIEoQcnGiADq_SWNgNRANfAc4Qe4CWnwSQdj5kM34IHsVAvtC8kY8wiYMf_DFzPb5GV"
-                alt="Mango pickle jar"
+                src="/grandma_red.jpg"
+                alt="Grandmother mixing pickles"
                 className="w-full h-full object-cover"
               />
             </div>
