@@ -3,7 +3,7 @@ import useEmblaCarousel from 'embla-carousel-react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useTranslation } from 'react-i18next';
-import { Star, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Star, ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react';
 
 interface Testimonial {
   id: string;
@@ -26,12 +26,14 @@ export function TestimonialsCarousel() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [scrollSnaps, setScrollSnaps] = useState<number[]>([]);
 
-  const { data: testimonials = [], isLoading } = useQuery<Testimonial[]>({
+  const { data: testimonials = [], isLoading, isError } = useQuery<Testimonial[]>({
     queryKey: ['testimonials-active'],
     queryFn: async () => {
       const res = await api.get('/testimonials');
       return res.data;
     },
+    retry: 1,
+    staleTime: 60000,
   });
 
   const scrollPrev = useCallback(() => emblaApi && emblaApi.scrollPrev(), [emblaApi]);
@@ -62,18 +64,53 @@ export function TestimonialsCarousel() {
     emblaApi.on('reInit', onSelect);
   }, [emblaApi, onSelect]);
 
-  if (isLoading) {
+  // If there is a loading delay, show a beautiful shimmer matching our layout
+  if (isLoading && !isError) {
     return (
-      <section className="py-16 bg-gradient-to-b from-amber-50/50 to-orange-50/30">
-        <div className="container px-4 text-center">
-          <div className="h-6 w-48 bg-muted animate-pulse mx-auto rounded mb-4" />
-          <div className="max-w-2xl mx-auto h-32 bg-muted animate-pulse rounded-2xl" />
+      <section className="py-16 bg-gradient-to-b from-amber-50/30 to-orange-50/10 border-y border-amber-100/20">
+        <div className="container px-4 mx-auto max-w-6xl">
+          {/* Header Shimmer */}
+          <div className="text-center mb-12 space-y-3">
+            <div className="h-8 w-64 bg-zinc-200/60 rounded-xl animate-pulse mx-auto" />
+            <div className="h-1 w-16 bg-amber-200 rounded-full mx-auto" />
+          </div>
+          
+          {/* Cards Shimmer Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div 
+                key={i} 
+                className="bg-white rounded-2xl p-6 border border-amber-50/50 shadow-sm space-y-5 h-56 flex flex-col justify-between"
+              >
+                <div className="space-y-4">
+                  {/* Stars Row */}
+                  <div className="flex gap-1">
+                    {Array.from({ length: 5 }).map((_, s) => (
+                      <div key={s} className="w-4 h-4 bg-zinc-200/60 rounded-full animate-pulse" />
+                    ))}
+                  </div>
+                  {/* Paragraph lines */}
+                  <div className="space-y-2">
+                    <div className="h-3.5 bg-zinc-100 rounded-lg animate-pulse w-full" />
+                    <div className="h-3.5 bg-zinc-100 rounded-lg animate-pulse w-5/6" />
+                    <div className="h-3.5 bg-zinc-100 rounded-lg animate-pulse w-2/3" />
+                  </div>
+                </div>
+                {/* Author Info */}
+                <div className="space-y-2 pt-4 border-t border-zinc-50">
+                  <div className="h-4 bg-zinc-200/60 rounded-md animate-pulse w-1/3" />
+                  <div className="h-3 bg-zinc-100 rounded-md animate-pulse w-1/4" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
     );
   }
 
-  if (testimonials.length === 0) {
+  // Hide the section completely if there are no testimonials or if the backend request failed
+  if (isError || testimonials.length === 0) {
     return null;
   }
 
