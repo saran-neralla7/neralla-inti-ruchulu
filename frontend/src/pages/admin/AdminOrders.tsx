@@ -10,6 +10,7 @@ import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useModalStore } from '@/store/modalStore';
 import { generateOrderPDF } from '@/utils/generateOrderPDF';
+import { generateOrdersReportPDF } from '@/utils/generateOrdersReportPDF';
 import type { Order } from '@/types';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -39,6 +40,7 @@ function EditOrderDrawer({ order, onClose }: { order: Order; onClose: () => void
       ? order.actualAmountPaid.toString()
       : ''
   );
+  const [paymentStatus, setPaymentStatus] = useState<string>(order.paymentStatus || 'Unpaid');
 
   const editMutation = useMutation({
     mutationFn: async () => {
@@ -50,6 +52,7 @@ function EditOrderDrawer({ order, onClose }: { order: Order; onClose: () => void
         items,
         actualShippingCost: Number(actualShippingCost) || 0,
         actualAmountPaid: actualAmountPaid !== '' ? Number(actualAmountPaid) : null,
+        paymentStatus,
       });
       return res.data;
     },
@@ -120,7 +123,7 @@ function EditOrderDrawer({ order, onClose }: { order: Order; onClose: () => void
         </div>
 
         {order.orderNumber && (
-          <div className="space-y-2 border-t border-border/30 pt-3">
+          <div className="space-y-3 border-t border-border/30 pt-3">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Finance & Shipping</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -148,6 +151,17 @@ function EditOrderDrawer({ order, onClose }: { order: Order; onClose: () => void
                   />
                 </div>
               </div>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Payment Status</label>
+              <select
+                value={paymentStatus}
+                onChange={e => setPaymentStatus(e.target.value)}
+                className="w-full border border-border rounded-lg px-2.5 py-1.5 text-xs bg-background"
+              >
+                <option value="Unpaid">Unpaid (చెల్లించలేదు)</option>
+                <option value="Paid">Paid (చెల్లించారు)</option>
+              </select>
             </div>
           </div>
         )}
@@ -182,10 +196,29 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div><p className="text-xs text-muted-foreground">Customer</p><p className="font-semibold">{order.customerName}</p></div>
           <div><p className="text-xs text-muted-foreground">Phone</p><p className="font-semibold">{order.customerPhone}</p></div>
-          <div><p className="text-xs text-muted-foreground">Status</p>
+          <div><p className="text-xs text-muted-foreground">Fulfillment Status</p>
             <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', STATUS_COLORS[order.status] || 'bg-muted text-muted-foreground')}>{order.status}</span>
           </div>
           <div><p className="text-xs text-muted-foreground">Placed</p><p className="font-semibold">{new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p></div>
+          {order.orderNumber && (
+            <>
+              <div><p className="text-xs text-muted-foreground">Payment Status</p>
+                <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', order.paymentStatus === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')}>
+                  {order.paymentStatus || 'Unpaid'}
+                </span>
+              </div>
+              <div><p className="text-xs text-muted-foreground">Actual Paid Amount</p>
+                <p className="font-semibold text-primary">
+                  {order.actualAmountPaid !== null && order.actualAmountPaid !== undefined ? `₹${order.actualAmountPaid}` : '-'}
+                </p>
+              </div>
+              <div><p className="text-xs text-muted-foreground">Actual Courier Cost</p>
+                <p className="font-semibold text-zinc-700">
+                  {order.actualShippingCost !== undefined ? `₹${order.actualShippingCost}` : '₹0'}
+                </p>
+              </div>
+            </>
+          )}
         </div>
         {(order as any).adminNotes && (
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
@@ -232,17 +265,33 @@ export function AdminOrders() {
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
 
+  // Search & Filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateFilterPreset, setDateFilterPreset] = useState('all'); // 'all', 'today', 'yesterday', 'this-week', 'this-month', 'custom'
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState('all');
+
   // Custom status update modal states
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [statusModalOrder, setStatusModalOrder] = useState<Order | null>(null);
   const [statusModalNextStatus, setStatusModalNextStatus] = useState<string>('');
   const [shippingCostInput, setShippingCostInput] = useState<string>('');
   const [amountPaidInput, setAmountPaidInput] = useState<string>('');
+  const [markAsPaidInput, setMarkAsPaidInput] = useState<boolean>(false);
 
   const { data: orders = [], isLoading } = useQuery<Order[]>({
     queryKey: ['admin-orders'],
     queryFn: async () => {
       const res = await api.get('/orders');
+      return res.data;
+    },
+  });
+
+  const { data: productsList = [] } = useQuery<any[]>({
+    queryKey: ['admin-products-list'],
+    queryFn: async () => {
+      const res = await api.get('/products');
       return res.data;
     },
   });
@@ -256,20 +305,32 @@ export function AdminOrders() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status, actualShippingCost, actualAmountPaid }: { id: string; status: string; actualShippingCost?: number; actualAmountPaid?: number }) => {
-      const res = await api.put(`/orders/${id}/status`, { status, actualShippingCost, actualAmountPaid });
+    mutationFn: async ({ id, status, actualShippingCost, actualAmountPaid, paymentStatus }: { id: string; status?: string; actualShippingCost?: number; actualAmountPaid?: number | null; paymentStatus?: string }) => {
+      const res = await api.put(`/orders/${id}/status`, { status, actualShippingCost, actualAmountPaid, paymentStatus });
       return res.data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-orders'] }),
   });
 
+  const togglePaymentStatus = (order: Order) => {
+    const nextPaymentStatus = order.paymentStatus === 'Paid' ? 'Unpaid' : 'Paid';
+    updateStatusMutation.mutate({
+      id: order.id,
+      paymentStatus: nextPaymentStatus,
+      actualAmountPaid: nextPaymentStatus === 'Paid'
+        ? (order.actualAmountPaid !== null && order.actualAmountPaid !== undefined ? order.actualAmountPaid : total(order))
+        : null,
+    });
+  };
+
   const handleStatusChange = (order: Order, nextStatus: string) => {
-    if (nextStatus === 'Shipped' || nextStatus === 'Delivered') {
+    if (nextStatus === 'Out For Delivery' || nextStatus === 'Delivered') {
       const collected = total(order) < 999 ? 80 : 0;
       setStatusModalOrder(order);
       setStatusModalNextStatus(nextStatus);
       setShippingCostInput((order.actualShippingCost ?? collected).toString());
       setAmountPaidInput((order.actualAmountPaid ?? total(order)).toString());
+      setMarkAsPaidInput(order.paymentStatus === 'Paid' || nextStatus === 'Delivered');
       setStatusModalOpen(true);
     } else {
       updateStatusMutation.mutate({ id: order.id, status: nextStatus });
@@ -279,13 +340,17 @@ export function AdminOrders() {
   const handleSaveStatusModal = () => {
     if (!statusModalOrder) return;
     const cost = parseFloat(shippingCostInput) || 0;
-    const amountPaid = statusModalNextStatus === 'Delivered' ? (parseFloat(amountPaidInput) || 0) : undefined;
+    const amountPaid = statusModalNextStatus === 'Delivered'
+      ? (markAsPaidInput ? (parseFloat(amountPaidInput) || 0) : null)
+      : undefined;
+    const payStatus = markAsPaidInput ? 'Paid' : 'Unpaid';
 
     updateStatusMutation.mutate({
       id: statusModalOrder.id,
       status: statusModalNextStatus,
       actualShippingCost: cost,
       actualAmountPaid: amountPaid,
+      paymentStatus: payStatus,
     });
 
     setStatusModalOpen(false);
@@ -302,7 +367,64 @@ export function AdminOrders() {
 
   const pendingOrders = orders.filter(o => o.status === 'Pending Approval');
   const activeOrders = orders.filter(o => o.status !== 'Pending Approval');
-  const filteredActive = filterStatus === 'all' ? activeOrders : activeOrders.filter(o => o.status === filterStatus);
+
+  const filteredActive = activeOrders.filter(order => {
+    // 1. Status Filter Tab
+    if (filterStatus !== 'all' && order.status !== filterStatus) return false;
+    
+    // 2. Search Query (name, phone, order number)
+    const query = searchQuery.toLowerCase().trim();
+    if (query) {
+      const nameMatch = order.customerName.toLowerCase().includes(query);
+      const phoneMatch = order.customerPhone.includes(query);
+      const numberMatch = order.orderNumber ? order.orderNumber.toLowerCase().includes(query) : false;
+      if (!nameMatch && !phoneMatch && !numberMatch) return false;
+    }
+    
+    // 3. Product filter
+    if (selectedProduct !== 'all') {
+      const hasProduct = order.items.some(item => 
+        item.productName_en.toLowerCase() === selectedProduct.toLowerCase() || 
+        item.productName_te === selectedProduct
+      );
+      if (!hasProduct) return false;
+    }
+    
+    // 4. Date filter
+    const orderDate = new Date(order.createdAt);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (dateFilterPreset === 'today') {
+      const startOfToday = new Date(today);
+      if (orderDate < startOfToday) return false;
+    } else if (dateFilterPreset === 'yesterday') {
+      const startOfYesterday = new Date(today);
+      startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+      const endOfYesterday = new Date(today);
+      if (orderDate < startOfYesterday || orderDate >= endOfYesterday) return false;
+    } else if (dateFilterPreset === 'this-week') {
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(startOfWeek.getDate() - today.getDay());
+      if (orderDate < startOfWeek) return false;
+    } else if (dateFilterPreset === 'this-month') {
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      if (orderDate < startOfMonth) return false;
+    } else if (dateFilterPreset === 'custom') {
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        if (orderDate < start) return false;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        if (orderDate > end) return false;
+      }
+    }
+    
+    return true;
+  });
 
   const handleApprove = (order: Order) => {
     showConfirm({
@@ -470,7 +592,7 @@ export function AdminOrders() {
       {activeTab === 'active' && (
         <div>
           {/* Status filter */}
-          <div className="flex flex-wrap gap-2 mb-5">
+          <div className="flex flex-wrap gap-2 mb-4">
             {['all', ...ACTIVE_STATUSES].map(s => (
               <button
                 key={s}
@@ -485,6 +607,98 @@ export function AdminOrders() {
                 {s === 'all' ? 'All' : s}
               </button>
             ))}
+          </div>
+
+          {/* Search & Filters Bar */}
+          <div className="bg-card border border-border/60 rounded-2xl p-4 mb-6 space-y-4 shadow-sm">
+            <div className="flex flex-col md:flex-row gap-3">
+              {/* Search Bar */}
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  placeholder="Search customer name, phone, order no..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 border border-border rounded-xl text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </span>
+              </div>
+
+              {/* Product Selector */}
+              <div className="w-full md:w-48">
+                <select
+                  value={selectedProduct}
+                  onChange={e => setSelectedProduct(e.target.value)}
+                  className="w-full border border-border rounded-xl px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="all">All Products</option>
+                  {productsList.map((p: any) => (
+                    <option key={p.id} value={p.name_en}>
+                      {p.name_en}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Date Preset Selector */}
+              <div className="w-full md:w-48">
+                <select
+                  value={dateFilterPreset}
+                  onChange={e => setDateFilterPreset(e.target.value)}
+                  className="w-full border border-border rounded-xl px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="all">All Time</option>
+                  <option value="today">Today</option>
+                  <option value="yesterday">Yesterday</option>
+                  <option value="this-week">This Week</option>
+                  <option value="this-month">This Month</option>
+                  <option value="custom">Custom Range</option>
+                </select>
+              </div>
+
+              {/* PDF Print Button */}
+              <Button
+                onClick={() => generateOrdersReportPDF(filteredActive, {
+                  searchQuery,
+                  datePreset: dateFilterPreset,
+                  startDate,
+                  endDate,
+                  selectedProduct
+                })}
+                disabled={filteredActive.length === 0}
+                className="bg-primary hover:bg-primary/95 text-white rounded-xl px-4 py-2 text-sm font-semibold flex items-center justify-center gap-1.5 h-10 shrink-0"
+              >
+                <FileText className="h-4 w-4" /> Print PDF Report
+              </Button>
+            </div>
+
+            {/* Custom Date Inputs */}
+            {dateFilterPreset === 'custom' && (
+              <div className="flex gap-3 items-center border-t border-border/40 pt-3 animate-in slide-in-from-top-1 duration-200">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground">From:</span>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={e => setStartDate(e.target.value)}
+                    className="border border-border rounded-xl px-3 py-1.5 text-xs bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground">To:</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={e => setEndDate(e.target.value)}
+                    className="border border-border rounded-xl px-3 py-1.5 text-xs bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {isLoading && <p className="text-muted-foreground text-sm">Loading...</p>}
@@ -503,6 +717,7 @@ export function AdminOrders() {
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Order</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Customer</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Payment</th>
                     <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total</th>
                     <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
                   </tr>
@@ -532,6 +747,31 @@ export function AdminOrders() {
                               {ACTIVE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                             <ChevronDown className="absolute right-1 top-1/2 -translate-y-1/2 h-3 w-3 pointer-events-none opacity-60" />
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col gap-1 items-start">
+                            <button
+                              onClick={() => togglePaymentStatus(order)}
+                              disabled={updateStatusMutation.isPending}
+                              className={cn(
+                                'text-xs font-semibold px-2.5 py-1 rounded-full transition-all duration-150 active:scale-95 flex items-center gap-1',
+                                order.paymentStatus === 'Paid'
+                                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                  : 'bg-red-100 text-red-700 hover:bg-red-200'
+                              )}
+                              title="Click to toggle payment status"
+                            >
+                              <span className={cn('h-1.5 w-1.5 rounded-full', order.paymentStatus === 'Paid' ? 'bg-green-500' : 'bg-red-500')} />
+                              {order.paymentStatus === 'Paid' ? 'Paid' : 'Unpaid'}
+                            </button>
+                            {order.paymentStatus === 'Paid' && (
+                              <span className="text-xs text-muted-foreground font-medium pl-1">
+                                {order.actualAmountPaid !== null && order.actualAmountPaid !== undefined
+                                  ? `₹${order.actualAmountPaid}`
+                                  : `₹${total(order).toFixed(0)}`}
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3 text-right font-semibold text-primary">₹{total(order).toFixed(0)}</td>
@@ -595,23 +835,43 @@ export function AdminOrders() {
 
               {/* Customer Paid Amount Input (Only show when marking as Delivered) */}
               {statusModalNextStatus === 'Delivered' && (
-                <div>
-                  <label className="text-sm font-semibold text-foreground mb-1.5 block">
-                    Actual Amount Paid by Customer (Inflow)
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary text-sm font-bold">₹</span>
-                    <input
-                      type="number"
-                      value={amountPaidInput}
-                      onChange={(e) => setAmountPaidInput(e.target.value)}
-                      placeholder="e.g. 500"
-                      className="w-full pl-7 pr-3 py-2 rounded-lg border border-border text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 font-bold text-primary"
-                    />
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-semibold text-foreground mb-1.5 block">
+                      Actual Amount Paid by Customer (Inflow)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary text-sm font-bold">₹</span>
+                      <input
+                        type="number"
+                        value={amountPaidInput}
+                        onChange={(e) => setAmountPaidInput(e.target.value)}
+                        placeholder="e.g. 500"
+                        className="w-full pl-7 pr-3 py-2 rounded-lg border border-border text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 font-bold text-primary"
+                      />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Enter the exact amount collected from the customer.
+                    </p>
                   </div>
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    Enter the exact amount collected from the customer.
-                  </p>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="markAsPaidCheckbox"
+                      checked={markAsPaidInput}
+                      onChange={(e) => {
+                        setMarkAsPaidInput(e.target.checked);
+                        if (e.target.checked && !amountPaidInput) {
+                          setAmountPaidInput(total(statusModalOrder).toString());
+                        }
+                      }}
+                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary bg-background cursor-pointer"
+                    />
+                    <label htmlFor="markAsPaidCheckbox" className="text-sm font-semibold text-foreground select-none cursor-pointer">
+                      Payment Received (Mark as Paid)
+                    </label>
+                  </div>
                 </div>
               )}
             </div>

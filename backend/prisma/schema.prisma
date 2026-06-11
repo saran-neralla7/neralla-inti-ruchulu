@@ -72,6 +72,7 @@ model Order {
   approvedAt         DateTime?
   actualShippingCost Float       @default(0.0)
   actualAmountPaid   Float?
+  paymentStatus      String      @default("Unpaid")
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
   items              OrderItem[]

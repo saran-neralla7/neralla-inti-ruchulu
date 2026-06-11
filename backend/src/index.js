@@ -282,7 +282,8 @@ app.get('/api/orders', authenticateAdmin, async (req, res) => {
         res.json(orders);
     }
     catch (error) {
-        res.status(500).json({ error: 'Failed to fetch orders' });
+        console.error('Failed to fetch orders:', error);
+        res.status(500).json({ error: 'Failed to fetch orders', details: error.message || String(error) });
     }
 });
 // Get pending approval count (Admin Only)
@@ -362,14 +363,20 @@ app.put('/api/orders/:id/approve', authenticateAdmin, async (req, res) => {
 // Update Order Status (Admin Only) — for approved orders
 app.put('/api/orders/:id/status', authenticateAdmin, async (req, res) => {
     const id = req.params.id;
-    const { status, actualShippingCost, actualAmountPaid } = req.body;
+    const { status, actualShippingCost, actualAmountPaid, paymentStatus } = req.body;
     try {
-        const updateData = { status };
+        const updateData = {};
+        if (status !== undefined) {
+            updateData.status = status;
+        }
         if (actualShippingCost !== undefined) {
             updateData.actualShippingCost = Number(actualShippingCost) || 0;
         }
         if (actualAmountPaid !== undefined) {
             updateData.actualAmountPaid = actualAmountPaid !== null ? Number(actualAmountPaid) : null;
+        }
+        if (paymentStatus !== undefined) {
+            updateData.paymentStatus = paymentStatus;
         }
         const order = await prisma.order.update({
             where: { id },
@@ -385,7 +392,7 @@ app.put('/api/orders/:id/status', authenticateAdmin, async (req, res) => {
 // Edit pending/approved order details and items (Admin Only)
 app.put('/api/orders/:id', authenticateAdmin, async (req, res) => {
     const id = req.params.id;
-    const { customerName, customerPhone, customerAddress, adminNotes, items, actualShippingCost, actualAmountPaid } = req.body;
+    const { customerName, customerPhone, customerAddress, adminNotes, items, actualShippingCost, actualAmountPaid, paymentStatus } = req.body;
     try {
         // Delete existing items and recreate
         await prisma.orderItem.deleteMany({ where: { orderId: id } });
@@ -410,6 +417,9 @@ app.put('/api/orders/:id', authenticateAdmin, async (req, res) => {
         }
         if (actualAmountPaid !== undefined) {
             updateData.actualAmountPaid = actualAmountPaid !== null ? Number(actualAmountPaid) : null;
+        }
+        if (paymentStatus !== undefined) {
+            updateData.paymentStatus = paymentStatus;
         }
         const order = await prisma.order.update({
             where: { id },
@@ -484,13 +494,14 @@ app.get('/api/analytics/overview', authenticateAdmin, async (req, res) => {
             prisma.order.count({ where: { status: 'Pending Approval' } }),
             prisma.orderItem.findMany({ include: { order: true } }),
         ]);
-        const totalRevenue = approvedOrders.reduce((s, o) => {
+        const paidOrders = approvedOrders.filter(o => o.paymentStatus === 'Paid');
+        const totalRevenue = paidOrders.reduce((s, o) => {
             const orderRevenue = o.actualAmountPaid !== null && o.actualAmountPaid !== undefined ? o.actualAmountPaid : o.items.reduce((ss, i) => ss + i.price * i.quantity, 0);
             return s + orderRevenue;
         }, 0);
-        const avgOrderValue = approvedOrders.length > 0 ? totalRevenue / approvedOrders.length : 0;
+        const avgOrderValue = paidOrders.length > 0 ? totalRevenue / paidOrders.length : 0;
         const now = new Date();
-        const mtdOrders = approvedOrders.filter(o => {
+        const mtdOrders = paidOrders.filter(o => {
             const d = new Date(o.createdAt);
             return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
         });
@@ -509,7 +520,7 @@ app.get('/api/analytics/overview', authenticateAdmin, async (req, res) => {
 app.get('/api/analytics/revenue-by-month', authenticateAdmin, async (req, res) => {
     try {
         const orders = await prisma.order.findMany({
-            where: { orderNumber: { not: null } },
+            where: { orderNumber: { not: null }, paymentStatus: 'Paid' },
             include: { items: true },
             orderBy: { createdAt: 'asc' },
         });
@@ -563,7 +574,7 @@ app.get('/api/customers', authenticateAdmin, async (req, res) => {
                 customerMap[key] = { name: order.customerName, phone: order.customerPhone, totalOrders: 0, totalSpent: 0, lastOrderDate: order.createdAt, address: order.customerAddress };
             }
             customerMap[key].totalOrders += 1;
-            if (order.orderNumber)
+            if (order.orderNumber && order.paymentStatus === 'Paid')
                 customerMap[key].totalSpent += orderTotal;
             if (new Date(order.createdAt) > new Date(customerMap[key].lastOrderDate))
                 customerMap[key].lastOrderDate = order.createdAt;
@@ -735,6 +746,7 @@ app.get('/api/admin/reports/profit-loss', authenticateAdmin, async (req, res) =>
             where: {
                 orderNumber: { not: null },
                 status: { notIn: ['Pending Approval', 'Cancelled'] },
+                paymentStatus: 'Paid',
                 ...dateFilter,
             },
             include: {
