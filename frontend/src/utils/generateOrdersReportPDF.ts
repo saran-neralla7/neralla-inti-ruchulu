@@ -112,8 +112,16 @@ export async function generateOrdersReportPDF(orders: Order[], filters: ReportFi
     doc.text(`Page ${pageNum} of ${totalPages}`, 195, 287, { align: 'right' });
   };
 
+  // Sort orders sequentially: oldest first (ascending order of orderNumber / createdAt)
+  const sortedOrders = [...orders].sort((a, b) => {
+    if (a.orderNumber && b.orderNumber) {
+      return a.orderNumber.localeCompare(b.orderNumber);
+    }
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  });
+
   // ─── CALCULATE SUMMARY TOTALS ───
-  const totalOrders = orders.length;
+  const totalOrders = sortedOrders.length;
   
   const getOrderTotal = (o: Order) => o.items.reduce((s, i) => s + i.price * i.quantity, 0);
 
@@ -121,7 +129,7 @@ export async function generateOrdersReportPDF(orders: Order[], filters: ReportFi
   let totalOutstanding = 0;
   let totalCourierCost = 0;
 
-  orders.forEach(o => {
+  sortedOrders.forEach(o => {
     const orderTotal = o.actualAmountPaid !== null && o.actualAmountPaid !== undefined ? o.actualAmountPaid : getOrderTotal(o);
     if (o.paymentStatus === 'Paid') {
       totalCollected += orderTotal;
@@ -177,13 +185,13 @@ export async function generateOrdersReportPDF(orders: Order[], filters: ReportFi
   doc.setFontSize(11);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.text(totalOrders.toString(), 25, metricsY + 14);
-  doc.text(`₹${totalCollected.toFixed(0)}`, 70, metricsY + 14);
+  doc.text(`Rs. ${totalCollected.toFixed(0)}`, 70, metricsY + 14);
   
   doc.setTextColor(180, 83, 9); // Amber-700
-  doc.text(`₹${totalOutstanding.toFixed(0)}`, 115, metricsY + 14);
+  doc.text(`Rs. ${totalOutstanding.toFixed(0)}`, 115, metricsY + 14);
   
   doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-  doc.text(`₹${totalCourierCost.toFixed(0)}`, 160, metricsY + 14);
+  doc.text(`Rs. ${totalCourierCost.toFixed(0)}`, 160, metricsY + 14);
 
   // ─── ORDERS TABLE ───
   let tableY = 76;
@@ -211,7 +219,7 @@ export async function generateOrdersReportPDF(orders: Order[], filters: ReportFi
 
   let pageNum = 1;
 
-  orders.forEach((o) => {
+  sortedOrders.forEach((o) => {
     // Check page overflow
     if (curY > 270) {
       doc.addPage();
@@ -267,7 +275,7 @@ export async function generateOrdersReportPDF(orders: Order[], filters: ReportFi
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(textColor[0], textColor[1], textColor[2]);
       if (o.actualAmountPaid !== null && o.actualAmountPaid !== undefined) {
-        doc.text(` (₹${o.actualAmountPaid})`, 152, curY + 5.5);
+        doc.text(` (Rs. ${o.actualAmountPaid})`, 152, curY + 5.5);
       }
     } else {
       doc.setTextColor(180, 83, 9); // Amber-700
@@ -277,7 +285,7 @@ export async function generateOrdersReportPDF(orders: Order[], filters: ReportFi
     
     doc.setFont('helvetica', 'bold');
     const orderTotal = o.actualAmountPaid !== null && o.actualAmountPaid !== undefined ? o.actualAmountPaid : getOrderTotal(o);
-    doc.text(`₹${orderTotal.toFixed(0)}`, 193, curY + 5.5, { align: 'right' });
+    doc.text(`Rs. ${orderTotal.toFixed(0)}`, 193, curY + 5.5, { align: 'right' });
 
     curY += 8;
   });
