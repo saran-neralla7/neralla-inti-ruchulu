@@ -50,6 +50,8 @@ export interface Order {
   items: OrderItem[];
   createdAt: string;
   approvedAt?: string | null;
+  actualShippingCost?: number;
+  actualAmountPaid?: number | null;
 }
 
 export interface OrderItem {

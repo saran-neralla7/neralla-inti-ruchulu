@@ -53,11 +53,18 @@ export function AdminLayout() {
     <div className="flex min-h-screen bg-zinc-50">
       {/* Sidebar */}
       <aside className="w-60 flex-shrink-0 bg-card border-r border-border/50 flex flex-col shadow-sm">
-        <div className="px-5 py-5 border-b border-border/30">
-          <h1 className="font-headline font-bold text-lg text-primary leading-tight">
-            Neralla Inti Ruchulu
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Admin Panel</p>
+        <div className="px-5 py-5 border-b border-border/30 flex items-center gap-3">
+          <img
+            src="/logo.png"
+            alt="Neralla Inti Ruchulu Logo"
+            className="h-10 w-10 object-contain rounded-full shadow-sm"
+          />
+          <div>
+            <h1 className="font-headline font-bold text-sm text-primary leading-tight">
+              Neralla Inti Ruchulu
+            </h1>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Admin Panel</p>
+          </div>
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1">

@@ -71,6 +71,7 @@ model Order {
   adminNotes         String?
   approvedAt         DateTime?
   actualShippingCost Float       @default(0.0)
+  actualAmountPaid   Float?
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
   items              OrderItem[]

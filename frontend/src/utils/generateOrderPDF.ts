@@ -1,6 +1,34 @@
 import jsPDF from 'jspdf';
 
+function getLogoBase64(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.src = url;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      } else {
+        reject(new Error('Canvas context not available'));
+      }
+    };
+    img.onerror = (err) => reject(err);
+  });
+}
+
 export async function generateOrderPDF(order: any): Promise<void> {
+  let logoBase64 = '';
+  try {
+    logoBase64 = await getLogoBase64('/logo.png');
+  } catch (err) {
+    console.error('Failed to load logo for PDF:', err);
+  }
+
   const doc = new jsPDF();
   
   // Color palette
@@ -14,15 +42,39 @@ export async function generateOrderPDF(order: any): Promise<void> {
   doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.rect(0, 0, 210, 40, 'F');
 
-  // Title / Branding
+  // Title / Branding (with logo if loaded)
   doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(22);
-  doc.text('NERALLA INTI RUCHULU', 15, 18);
+  if (logoBase64) {
+    try {
+      doc.addImage(logoBase64, 'PNG', 15, 11, 18, 18);
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(20);
+      doc.text('NERALLA INTI RUCHULU', 38, 20);
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.text('Premium Andhra Home Foods', 15, 25);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text('Premium Andhra Home Foods', 38, 27);
+    } catch (err) {
+      console.error('Failed to add logo image to PDF:', err);
+      // Fallback
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(22);
+      doc.text('NERALLA INTI RUCHULU', 15, 18);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.text('Premium Andhra Home Foods', 15, 25);
+    }
+  } else {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.text('NERALLA INTI RUCHULU', 15, 18);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text('Premium Andhra Home Foods', 15, 25);
+  }
 
   // Invoice label on the right
   doc.setFont('helvetica', 'bold');
@@ -31,6 +83,20 @@ export async function generateOrderPDF(order: any): Promise<void> {
 
   // Reset text color
   doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+
+  // Watermark logo in background (very subtle opacity)
+  if (logoBase64) {
+    try {
+      const gState = new (doc as any).GState({ opacity: 0.05 });
+      (doc as any).setGState(gState);
+      doc.addImage(logoBase64, 'PNG', 55, 98.5, 100, 100);
+      // Restore opacity to normal
+      const resetState = new (doc as any).GState({ opacity: 1.0 });
+      (doc as any).setGState(resetState);
+    } catch (err) {
+      console.error('Watermark opacity failed:', err);
+    }
+  }
 
   // Order Info Column 1 (Left)
   doc.setFont('helvetica', 'bold');

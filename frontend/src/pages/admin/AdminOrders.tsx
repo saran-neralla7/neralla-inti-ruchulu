@@ -185,6 +185,13 @@ export function AdminOrders() {
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
 
+  // Custom status update modal states
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [statusModalOrder, setStatusModalOrder] = useState<Order | null>(null);
+  const [statusModalNextStatus, setStatusModalNextStatus] = useState<string>('');
+  const [shippingCostInput, setShippingCostInput] = useState<string>('');
+  const [amountPaidInput, setAmountPaidInput] = useState<string>('');
+
   const { data: orders = [], isLoading } = useQuery<Order[]>({
     queryKey: ['admin-orders'],
     queryFn: async () => {
@@ -202,8 +209,8 @@ export function AdminOrders() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status, actualShippingCost }: { id: string; status: string; actualShippingCost?: number }) => {
-      const res = await api.put(`/orders/${id}/status`, { status, actualShippingCost });
+    mutationFn: async ({ id, status, actualShippingCost, actualAmountPaid }: { id: string; status: string; actualShippingCost?: number; actualAmountPaid?: number }) => {
+      const res = await api.put(`/orders/${id}/status`, { status, actualShippingCost, actualAmountPaid });
       return res.data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-orders'] }),
@@ -212,16 +219,30 @@ export function AdminOrders() {
   const handleStatusChange = (order: Order, nextStatus: string) => {
     if (nextStatus === 'Shipped' || nextStatus === 'Delivered') {
       const collected = total(order) < 999 ? 80 : 0;
-      const val = window.prompt(
-        `Enter Actual Courier Shipping Cost paid to courier for order ${order.orderNumber} (Collected from customer: ₹${collected}):`,
-        collected.toString()
-      );
-      if (val === null) return;
-      const cost = parseFloat(val) || 0;
-      updateStatusMutation.mutate({ id: order.id, status: nextStatus, actualShippingCost: cost });
+      setStatusModalOrder(order);
+      setStatusModalNextStatus(nextStatus);
+      setShippingCostInput((order.actualShippingCost ?? collected).toString());
+      setAmountPaidInput((order.actualAmountPaid ?? total(order)).toString());
+      setStatusModalOpen(true);
     } else {
       updateStatusMutation.mutate({ id: order.id, status: nextStatus });
     }
+  };
+
+  const handleSaveStatusModal = () => {
+    if (!statusModalOrder) return;
+    const cost = parseFloat(shippingCostInput) || 0;
+    const amountPaid = statusModalNextStatus === 'Delivered' ? (parseFloat(amountPaidInput) || 0) : undefined;
+
+    updateStatusMutation.mutate({
+      id: statusModalOrder.id,
+      status: statusModalNextStatus,
+      actualShippingCost: cost,
+      actualAmountPaid: amountPaid,
+    });
+
+    setStatusModalOpen(false);
+    setStatusModalOrder(null);
   };
 
   const deleteOrderMutation = useMutation({
@@ -493,6 +514,79 @@ export function AdminOrders() {
       {/* Modals */}
       {editingOrder && <EditOrderDrawer order={editingOrder} onClose={() => setEditingOrder(null)} />}
       {viewingOrder && <OrderDetailModal order={viewingOrder} onClose={() => setViewingOrder(null)} />}
+      
+      {statusModalOpen && statusModalOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-in fade-in duration-200">
+          <div className="bg-card border border-border/80 w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-5 transform transition-all duration-300 scale-100">
+            <h3 className="font-headline text-lg font-bold text-primary flex items-center gap-2 border-b border-border pb-3">
+              Order {statusModalOrder.orderNumber} Details
+            </h3>
+            
+            <div className="space-y-4">
+              {/* Courier Shipping Cost Input */}
+              <div>
+                <label className="text-sm font-semibold text-foreground mb-1.5 block">
+                  Actual Courier Shipping Cost paid (Outflow)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">₹</span>
+                  <input
+                    type="number"
+                    value={shippingCostInput}
+                    onChange={(e) => setShippingCostInput(e.target.value)}
+                    placeholder="e.g. 80"
+                    className="w-full pl-7 pr-3 py-2 rounded-lg border border-border text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Enter the exact courier delivery fee paid.
+                </p>
+              </div>
+
+              {/* Customer Paid Amount Input (Only show when marking as Delivered) */}
+              {statusModalNextStatus === 'Delivered' && (
+                <div>
+                  <label className="text-sm font-semibold text-foreground mb-1.5 block">
+                    Actual Amount Paid by Customer (Inflow)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary text-sm font-bold">₹</span>
+                    <input
+                      type="number"
+                      value={amountPaidInput}
+                      onChange={(e) => setAmountPaidInput(e.target.value)}
+                      placeholder="e.g. 500"
+                      className="w-full pl-7 pr-3 py-2 rounded-lg border border-border text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 font-bold text-primary"
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Enter the exact amount collected from the customer.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setStatusModalOpen(false);
+                  setStatusModalOrder(null);
+                }}
+                className="rounded-xl border-border/80"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveStatusModal}
+                className="bg-primary hover:bg-primary/95 text-white rounded-xl font-semibold"
+              >
+                Save & Update Status
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

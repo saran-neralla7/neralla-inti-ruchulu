@@ -376,11 +376,14 @@ app.put('/api/orders/:id/approve', authenticateAdmin, async (req, res) => {
 // Update Order Status (Admin Only) — for approved orders
 app.put('/api/orders/:id/status', authenticateAdmin, async (req, res) => {
   const id = req.params.id as string;
-  const { status, actualShippingCost } = req.body;
+  const { status, actualShippingCost, actualAmountPaid } = req.body;
   try {
     const updateData: any = { status };
     if (actualShippingCost !== undefined) {
       updateData.actualShippingCost = Number(actualShippingCost) || 0;
+    }
+    if (actualAmountPaid !== undefined) {
+      updateData.actualAmountPaid = actualAmountPaid !== null ? Number(actualAmountPaid) : null;
     }
     const order = await prisma.order.update({
       where: { id },
@@ -484,14 +487,20 @@ app.get('/api/analytics/overview', authenticateAdmin, async (req, res) => {
       prisma.order.count({ where: { status: 'Pending Approval' } }),
       prisma.orderItem.findMany({ include: { order: true } }),
     ]);
-    const totalRevenue = approvedOrders.reduce((s, o) => s + o.items.reduce((ss, i) => ss + i.price * i.quantity, 0), 0);
+    const totalRevenue = approvedOrders.reduce((s, o) => {
+      const orderRevenue = o.actualAmountPaid !== null && o.actualAmountPaid !== undefined ? o.actualAmountPaid : o.items.reduce((ss, i) => ss + i.price * i.quantity, 0);
+      return s + orderRevenue;
+    }, 0);
     const avgOrderValue = approvedOrders.length > 0 ? totalRevenue / approvedOrders.length : 0;
     const now = new Date();
     const mtdOrders = approvedOrders.filter(o => {
       const d = new Date(o.createdAt);
       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     });
-    const mtdRevenue = mtdOrders.reduce((s, o) => s + o.items.reduce((ss, i) => ss + i.price * i.quantity, 0), 0);
+    const mtdRevenue = mtdOrders.reduce((s, o) => {
+      const orderRevenue = o.actualAmountPaid !== null && o.actualAmountPaid !== undefined ? o.actualAmountPaid : o.items.reduce((ss, i) => ss + i.price * i.quantity, 0);
+      return s + orderRevenue;
+    }, 0);
     const statusCounts: Record<string, number> = {};
     (await prisma.order.groupBy({ by: ['status'], _count: { id: true } })).forEach(g => { statusCounts[g.status] = g._count.id; });
     res.json({ totalOrders, totalRevenue, avgOrderValue, pendingOrders, mtdRevenue, mtdOrders: mtdOrders.length, statusCounts });
@@ -511,7 +520,8 @@ app.get('/api/analytics/revenue-by-month', authenticateAdmin, async (req, res) =
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const label = d.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
       if (!monthMap[key]) monthMap[key] = { month: label, revenue: 0, orders: 0 };
-      monthMap[key].revenue += order.items.reduce((s, i) => s + i.price * i.quantity, 0);
+      const orderRevenue = order.actualAmountPaid !== null && order.actualAmountPaid !== undefined ? order.actualAmountPaid : order.items.reduce((s, i) => s + i.price * i.quantity, 0);
+      monthMap[key].revenue += orderRevenue;
       monthMap[key].orders += 1;
     });
     const sorted = Object.entries(monthMap).sort(([a], [b]) => a.localeCompare(b)).slice(-6).map(([, v]) => v);
@@ -543,7 +553,7 @@ app.get('/api/customers', authenticateAdmin, async (req, res) => {
     const customerMap: Record<string, any> = {};
     orders.forEach(order => {
       const key = order.customerPhone;
-      const orderTotal = order.items.reduce((s, i) => s + i.price * i.quantity, 0);
+      const orderTotal = order.actualAmountPaid !== null && order.actualAmountPaid !== undefined ? order.actualAmountPaid : order.items.reduce((s, i) => s + i.price * i.quantity, 0);
       if (!customerMap[key]) {
         customerMap[key] = { name: order.customerName, phone: order.customerPhone, totalOrders: 0, totalSpent: 0, lastOrderDate: order.createdAt, address: order.customerAddress };
       }
@@ -731,7 +741,8 @@ app.get('/api/admin/reports/profit-loss', authenticateAdmin, async (req, res) =>
         totalCogs += costPrice * item.quantity;
       });
 
-      grossRevenue += orderProductTotal;
+      const orderRevenue = order.actualAmountPaid !== null && order.actualAmountPaid !== undefined ? order.actualAmountPaid : orderProductTotal;
+      grossRevenue += orderRevenue;
       totalActualShippingCost += order.actualShippingCost ?? 0;
       // Shipping collected is 0 since we don't charge shipping on the PWA storefront checkout
     });
