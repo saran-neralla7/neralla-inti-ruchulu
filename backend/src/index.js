@@ -382,31 +382,38 @@ app.put('/api/orders/:id/status', authenticateAdmin, async (req, res) => {
         res.status(500).json({ error: 'Failed to update order status' });
     }
 });
-// Edit pending order details and items (Admin Only)
+// Edit pending/approved order details and items (Admin Only)
 app.put('/api/orders/:id', authenticateAdmin, async (req, res) => {
     const id = req.params.id;
-    const { customerName, customerPhone, customerAddress, adminNotes, items } = req.body;
+    const { customerName, customerPhone, customerAddress, adminNotes, items, actualShippingCost, actualAmountPaid } = req.body;
     try {
         // Delete existing items and recreate
         await prisma.orderItem.deleteMany({ where: { orderId: id } });
+        const updateData = {
+            customerName,
+            customerPhone,
+            customerAddress,
+            adminNotes,
+            items: {
+                create: (items || []).map((item) => ({
+                    productName_en: item.productName_en,
+                    productName_te: item.productName_te,
+                    variantSize: item.variantSize,
+                    variantPackaging: item.variantPackaging,
+                    quantity: Number(item.quantity),
+                    price: Number(item.price),
+                }))
+            }
+        };
+        if (actualShippingCost !== undefined) {
+            updateData.actualShippingCost = Number(actualShippingCost) || 0;
+        }
+        if (actualAmountPaid !== undefined) {
+            updateData.actualAmountPaid = actualAmountPaid !== null ? Number(actualAmountPaid) : null;
+        }
         const order = await prisma.order.update({
             where: { id },
-            data: {
-                customerName,
-                customerPhone,
-                customerAddress,
-                adminNotes,
-                items: {
-                    create: (items || []).map((item) => ({
-                        productName_en: item.productName_en,
-                        productName_te: item.productName_te,
-                        variantSize: item.variantSize,
-                        variantPackaging: item.variantPackaging,
-                        quantity: Number(item.quantity),
-                        price: Number(item.price),
-                    }))
-                }
-            },
+            data: updateData,
             include: { items: true },
         });
         res.json(order);

@@ -32,10 +32,24 @@ function EditOrderDrawer({ order, onClose }: { order: Order; onClose: () => void
   const [adminNotes, setAdminNotes] = useState((order as any).adminNotes || '');
   const [items, setItems] = useState((order.items || []).map((i: any) => ({ ...i })));
 
+  // Finance fields for approved/delivered orders
+  const [actualShippingCost, setActualShippingCost] = useState((order.actualShippingCost ?? 0).toString());
+  const [actualAmountPaid, setActualAmountPaid] = useState(
+    order.actualAmountPaid !== null && order.actualAmountPaid !== undefined
+      ? order.actualAmountPaid.toString()
+      : ''
+  );
+
   const editMutation = useMutation({
     mutationFn: async () => {
       const res = await api.put(`/orders/${order.id}`, {
-        customerName, customerPhone, customerAddress, adminNotes, items,
+        customerName,
+        customerPhone,
+        customerAddress,
+        adminNotes,
+        items,
+        actualShippingCost: Number(actualShippingCost) || 0,
+        actualAmountPaid: actualAmountPaid !== '' ? Number(actualAmountPaid) : null,
       });
       return res.data;
     },
@@ -104,6 +118,39 @@ function EditOrderDrawer({ order, onClose }: { order: Order; onClose: () => void
             onChange={e => setAdminNotes(e.target.value)}
           />
         </div>
+
+        {order.orderNumber && (
+          <div className="space-y-2 border-t border-border/30 pt-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Finance & Shipping</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Actual Courier Cost</label>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">₹</span>
+                  <input
+                    type="number"
+                    value={actualShippingCost}
+                    onChange={e => setActualShippingCost(e.target.value)}
+                    className="w-full pl-6 pr-2 py-1.5 border border-border rounded-lg text-xs bg-background"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Actual Amount Paid</label>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-primary text-xs font-bold">₹</span>
+                  <input
+                    type="number"
+                    value={actualAmountPaid}
+                    onChange={e => setActualAmountPaid(e.target.value)}
+                    placeholder="Auto (items total)"
+                    className="w-full pl-6 pr-2 py-1.5 border border-border rounded-lg text-xs bg-background font-bold text-primary"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-2 pt-2">
           <Button variant="outline" onClick={onClose} className="flex-1 rounded-xl">Cancel</Button>
@@ -493,10 +540,13 @@ export function AdminOrders() {
                             <button onClick={() => generateOrderPDF(order)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors" title="Download Invoice PDF">
                               <FileText className="h-4 w-4" />
                             </button>
-                            <button onClick={() => setViewingOrder(order)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors">
+                            <button onClick={() => setViewingOrder(order)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors" title="View Order">
                               <Eye className="h-4 w-4" />
                             </button>
-                            <button onClick={() => handleDelete(order)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-colors">
+                            <button onClick={() => setEditingOrder(order)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors" title="Edit Order">
+                              <Edit2 className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => handleDelete(order)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-colors" title="Delete Order">
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
