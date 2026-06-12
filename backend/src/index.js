@@ -967,12 +967,21 @@ app.get('/api/admin/reports/profit-loss', authenticateAdmin, async (req, res) =>
                 const costPrice = costMap[key] ?? 0;
                 totalCogs += costPrice * item.quantity;
             });
-            const orderRevenue = order.actualAmountPaid !== null && order.actualAmountPaid !== undefined ? order.actualAmountPaid : orderProductTotal;
-            grossRevenue += orderRevenue;
+            const orderTotal = orderProductTotal + (order.actualShippingCost ?? 0);
+            let paid = 0;
+            if (order.paymentStatus === 'Paid') {
+                paid = order.actualAmountPaid !== null && order.actualAmountPaid !== undefined ? order.actualAmountPaid : orderTotal;
+            }
+            else if (order.paymentStatus === 'Partially Paid') {
+                paid = order.actualAmountPaid !== null && order.actualAmountPaid !== undefined ? order.actualAmountPaid : (order.advancePaid + order.balancePaid);
+            }
+            else {
+                // Unpaid or other
+                paid = order.actualAmountPaid !== null && order.actualAmountPaid !== undefined ? order.actualAmountPaid : 0;
+            }
+            grossRevenue += paid;
             totalActualShippingCost += order.actualShippingCost ?? 0;
             // Shipping collected is 0 since we don't charge shipping on the PWA storefront checkout
-            const orderTotal = orderProductTotal + (order.actualShippingCost ?? 0);
-            const paid = order.actualAmountPaid !== null && order.actualAmountPaid !== undefined ? order.actualAmountPaid : orderTotal;
             const pending = Math.max(0, orderTotal - paid);
             totalPendingAmount += pending;
         });
