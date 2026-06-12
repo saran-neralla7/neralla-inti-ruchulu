@@ -904,6 +904,7 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export function AdminOrders() {
+  const total = (order: Order) => order.items.reduce((s, i) => s + i.price * i.quantity, 0);
   const queryClient = useQueryClient();
   const { showConfirm } = useModalStore();
   const [activeTab, setActiveTab] = useState<'pending' | 'active' | 'pending-payments'>('pending');
@@ -1151,7 +1152,7 @@ export function AdminOrders() {
     });
   };
 
-  const total = (order: Order) => order.items.reduce((s, i) => s + i.price * i.quantity, 0);
+
 
   return (
     <div className="p-6 md:p-8 max-w-6xl mx-auto">
