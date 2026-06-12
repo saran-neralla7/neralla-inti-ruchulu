@@ -165,7 +165,7 @@ export function About() {
                 </div>
                 <div>
                   <p className="font-semibold text-base text-foreground">Phone</p>
-                  <p className="text-muted-foreground text-sm mt-1">+91 891 234 5678</p>
+                  <p className="text-muted-foreground text-sm mt-1">+91-8247843466</p>
                 </div>
               </div>
 
