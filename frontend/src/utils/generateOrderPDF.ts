@@ -209,9 +209,19 @@ export async function generateOrderPDF(order: any): Promise<void> {
   const discount = order.discount ?? 0;
   const grandTotal = subtotal + deliveryCharge - discount;
   
-  const advancePaid = order.advancePaid ?? 0;
-  const balancePaid = order.balancePaid ?? 0;
-  const totalPaid = advancePaid + balancePaid;
+  let advancePaid = order.advancePaid ?? 0;
+  let balancePaid = order.balancePaid ?? 0;
+  let totalPaid = 0;
+  if (order.paymentStatus === 'Paid') {
+    totalPaid = order.actualAmountPaid !== null && order.actualAmountPaid !== undefined ? order.actualAmountPaid : grandTotal;
+    if (advancePaid === 0 && balancePaid === 0) {
+      balancePaid = totalPaid;
+    }
+  } else if (order.paymentStatus === 'Partially Paid') {
+    totalPaid = order.actualAmountPaid !== null && order.actualAmountPaid !== undefined ? order.actualAmountPaid : (advancePaid + balancePaid);
+  } else {
+    totalPaid = order.actualAmountPaid !== null && order.actualAmountPaid !== undefined ? order.actualAmountPaid : 0;
+  }
   const pendingBalance = Math.max(0, grandTotal - totalPaid);
 
   currentY += 6;

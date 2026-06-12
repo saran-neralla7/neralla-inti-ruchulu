@@ -129,12 +129,15 @@ export async function generateOrdersReportPDF(orders: Order[], filters: ReportFi
     const expectedTotal = itemsTotal + shipping;
     
     let paid = 0;
-    if (o.advancePaid !== undefined && o.balancePaid !== undefined) {
-      paid = (o.advancePaid ?? 0) + (o.balancePaid ?? 0);
-    } else if (o.actualAmountPaid !== null && o.actualAmountPaid !== undefined) {
-      paid = o.actualAmountPaid;
-    } else if (o.paymentStatus === 'Paid') {
-      paid = expectedTotal;
+    if (o.paymentStatus === 'Paid') {
+      paid = o.actualAmountPaid !== null && o.actualAmountPaid !== undefined ? o.actualAmountPaid : expectedTotal;
+    } else if (o.paymentStatus === 'Partially Paid') {
+      paid = o.actualAmountPaid !== null && o.actualAmountPaid !== undefined 
+        ? o.actualAmountPaid 
+        : ((o.advancePaid ?? 0) + (o.balancePaid ?? 0));
+    } else {
+      // Unpaid or other
+      paid = o.actualAmountPaid !== null && o.actualAmountPaid !== undefined ? o.actualAmountPaid : 0;
     }
     
     const pending = o.status === 'Cancelled' ? 0 : Math.max(0, expectedTotal - paid);
