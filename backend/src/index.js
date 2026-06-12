@@ -558,11 +558,10 @@ app.put('/api/settings', authenticateAdmin, async (req, res) => {
 // ─── ANALYTICS API ───
 app.get('/api/analytics/overview', authenticateAdmin, async (req, res) => {
     try {
-        const [totalOrders, approvedOrders, pendingOrders, allItems] = await Promise.all([
+        const [totalOrders, approvedOrders, pendingOrders] = await Promise.all([
             prisma.order.count(),
             prisma.order.findMany({ where: { orderNumber: { not: null } }, include: { items: true } }),
             prisma.order.count({ where: { status: 'Pending Approval' } }),
-            prisma.orderItem.findMany({ include: { order: true } }),
         ]);
         const paidOrders = approvedOrders.filter(o => o.paymentStatus === 'Paid');
         const totalRevenue = paidOrders.reduce((s, o) => {
@@ -614,7 +613,7 @@ app.get('/api/analytics/revenue-by-month', authenticateAdmin, async (req, res) =
 });
 app.get('/api/analytics/product-performance', authenticateAdmin, async (req, res) => {
     try {
-        const items = await prisma.orderItem.findMany({ include: { order: true } });
+        const items = await prisma.orderItem.findMany();
         const perfMap = {};
         items.forEach(item => {
             const key = item.productName_en;
