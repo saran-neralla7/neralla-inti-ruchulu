@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import {
   User, Lock, Smartphone, Info, Download, CheckCircle2,
   Shield, Globe, Store, Clock, Save, Check, AlertCircle, Link as LinkIcon,
-  Megaphone, Database, Upload, RefreshCw
+  Megaphone, Database, Upload, RefreshCw, Trash2, UserPlus
 } from 'lucide-react';
 import { useModalStore } from '@/store/modalStore';
 
@@ -49,6 +49,56 @@ export function AdminSettings() {
       const res = await api.get('/settings');
       return res.data;
     },
+  });
+
+  // Fetch admins (Super Admin Only)
+  const { data: adminUsers = [], isLoading: isLoadingAdmins, refetch: refetchAdmins } = useQuery({
+    queryKey: ['admin-users'],
+    queryFn: async () => {
+      const res = await api.get('/admin/users');
+      return res.data;
+    },
+    enabled: user?.role === 'Super Admin',
+  });
+
+  // Manage Admins State
+  const [newAdminUsername, setNewAdminUsername] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [newAdminRole, setNewAdminRole] = useState<'Super Admin' | 'Admin'>('Admin');
+  const [adminError, setAdminError] = useState('');
+  const [adminSuccess, setAdminSuccess] = useState('');
+
+  const createAdminMutation = useMutation({
+    mutationFn: async (newData: any) => {
+      return await api.post('/admin/users', newData);
+    },
+    onSuccess: () => {
+      refetchAdmins();
+      setNewAdminUsername('');
+      setNewAdminPassword('');
+      setNewAdminRole('Admin');
+      setAdminSuccess('Admin user created successfully!');
+      setTimeout(() => setAdminSuccess(''), 3000);
+    },
+    onError: (err: any) => {
+      setAdminError(err.response?.data?.error || 'Failed to create admin user');
+      setTimeout(() => setAdminError(''), 4000);
+    }
+  });
+
+  const deleteAdminMutation = useMutation({
+    mutationFn: async (adminId: string) => {
+      return await api.delete(`/admin/users/${adminId}`);
+    },
+    onSuccess: () => {
+      refetchAdmins();
+      setAdminSuccess('Admin user deleted successfully!');
+      setTimeout(() => setAdminSuccess(''), 3000);
+    },
+    onError: (err: any) => {
+      setAdminError(err.response?.data?.error || 'Failed to delete admin user');
+      setTimeout(() => setAdminError(''), 4000);
+    }
   });
 
   // Form State
@@ -581,6 +631,166 @@ export function AdminSettings() {
             </div>
           </div>
         </div>
+
+        {/* Manage Admin Accounts (Super Admin Only) */}
+        {user?.role === 'Super Admin' && (
+          <div className="bg-white rounded-2xl border border-zinc-100 p-6 space-y-6 shadow-sm">
+            <div className="flex items-center gap-2 border-b border-zinc-50 pb-4">
+              <Shield className="h-5 w-5 text-primary" />
+              <h2 className="font-headline font-semibold text-base text-zinc-950">Manage Admin Accounts</h2>
+            </div>
+
+            {/* Error and Success alerts */}
+            {adminError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl p-3 flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-red-500 shrink-0" />
+                <span>{adminError}</span>
+              </div>
+            )}
+            {adminSuccess && (
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-xl p-3 flex items-center gap-2">
+                <Check className="h-5 w-5 text-emerald-500 shrink-0" />
+                <span>{adminSuccess}</span>
+              </div>
+            )}
+
+            {/* Add New Admin Form */}
+            <div className="bg-zinc-50/50 rounded-xl border border-zinc-100 p-4 space-y-4">
+              <h3 className="text-sm font-semibold text-zinc-900 flex items-center gap-1.5">
+                <UserPlus className="h-4 w-4 text-primary" /> Add New Admin User
+              </h3>
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!newAdminUsername.trim() || !newAdminPassword.trim()) {
+                    setAdminError('Username and password are required');
+                    return;
+                  }
+                  createAdminMutation.mutate({
+                    username: newAdminUsername.trim(),
+                    password: newAdminPassword.trim(),
+                    role: newAdminRole,
+                  });
+                }}
+                className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end"
+              >
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider font-semibold">Username</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. manager"
+                    value={newAdminUsername}
+                    onChange={(e) => setNewAdminUsername(e.target.value)}
+                    className="w-full px-3 py-2 border border-zinc-200 bg-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-semibold"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider font-semibold">Password</label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    value={newAdminPassword}
+                    onChange={(e) => setNewAdminPassword(e.target.value)}
+                    className="w-full px-3 py-2 border border-zinc-200 bg-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider font-semibold">Access Role</label>
+                  <select
+                    value={newAdminRole}
+                    onChange={(e) => setNewAdminRole(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-zinc-200 bg-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-semibold"
+                  >
+                    <option value="Admin">Admin</option>
+                    <option value="Super Admin">Super Admin</option>
+                  </select>
+                </div>
+                <Button
+                  type="submit"
+                  disabled={createAdminMutation.isPending}
+                  className="bg-primary hover:bg-primary/95 text-white rounded-lg px-4 h-9.5 text-sm font-semibold flex items-center justify-center gap-1.5 shadow-sm w-full"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  {createAdminMutation.isPending ? 'Adding...' : 'Add User'}
+                </Button>
+              </form>
+            </div>
+
+            {/* List of existing admin users */}
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider font-semibold">Existing Admin Users</label>
+              {isLoadingAdmins ? (
+                <div className="h-20 bg-zinc-50 animate-pulse rounded-xl" />
+              ) : (
+                <div className="border border-zinc-100 rounded-xl overflow-hidden shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-zinc-100 text-sm">
+                      <thead className="bg-zinc-50 text-xs font-bold text-zinc-500 uppercase tracking-wider">
+                        <tr>
+                          <th className="px-4 py-3 text-left">Username</th>
+                          <th className="px-4 py-3 text-left">Role</th>
+                          <th className="px-4 py-3 text-left">Created At</th>
+                          <th className="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-zinc-100 text-zinc-700 font-medium">
+                        {adminUsers.map((admin: any) => (
+                          <tr key={admin.id} className="hover:bg-zinc-50/50 transition-colors">
+                            <td className="px-4 py-3 font-semibold text-zinc-900">{admin.username}</td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                admin.role === 'Super Admin' 
+                                  ? 'bg-purple-50 text-purple-700 border border-purple-100' 
+                                  : 'bg-zinc-50 text-zinc-700 border border-zinc-100'
+                              }`}>
+                                {admin.role}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-zinc-500 text-xs">
+                              {new Date(admin.createdAt).toLocaleDateString('en-IN', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                              })}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {admin.id === user?.id ? (
+                                <span className="text-xs text-muted-foreground italic mr-2">You</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    showConfirm({
+                                      title: 'Remove Admin User?',
+                                      description: `Are you sure you want to delete the admin user "${admin.username}"? They will lose all access immediately.`,
+                                      confirmText: 'Yes, Delete',
+                                      cancelText: 'Cancel',
+                                      isDestructive: true,
+                                      onConfirm: () => {
+                                        deleteAdminMutation.mutate(admin.id);
+                                      }
+                                    });
+                                  }}
+                                  disabled={deleteAdminMutation.isPending}
+                                  className="p-1 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Delete User"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* 7. PWA Install */}
         <div className="bg-white rounded-2xl border border-zinc-100 p-6 shadow-sm">

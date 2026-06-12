@@ -32,8 +32,9 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 function hashPassword(password) {
     return crypto.createHash('sha256').update(password).digest('hex');
 }
-// Simple authentication middleware using a static or generated admin token
-const ADMIN_TOKENS = new Set(['demo-token-static-admin']);
+const ADMIN_TOKENS = new Map([
+    ['demo-token-static-admin', { id: 'default', username: 'admin', role: 'Super Admin' }]
+]);
 function authenticateAdmin(req, res, next) {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -41,9 +42,25 @@ function authenticateAdmin(req, res, next) {
         return;
     }
     const token = authHeader.split(' ')[1];
-    if (!token || (!ADMIN_TOKENS.has(token) && !token.startsWith('demo-token-'))) {
+    if (!token) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
+    }
+    const user = ADMIN_TOKENS.get(token);
+    if (!user) {
+        if (token === 'demo-token-static-admin') {
+            req.adminUser = { id: 'default', username: 'admin', role: 'Super Admin' };
+        }
+        else if (token.startsWith('demo-token-')) {
+            req.adminUser = { id: 'unknown', username: 'admin', role: 'Super Admin' };
+        }
+        else {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+    }
+    else {
+        req.adminUser = user;
     }
     next();
 }
@@ -68,7 +85,11 @@ app.post('/api/admin/login', async (req, res) => {
             return;
         }
         const token = `demo-token-${Date.now()}-${crypto.randomBytes(8).toString('hex')}`;
-        ADMIN_TOKENS.add(token);
+        ADMIN_TOKENS.set(token, {
+            id: admin.id,
+            username: admin.username,
+            role: admin.role,
+        });
         res.json({
             token,
             user: {
@@ -1133,6 +1154,85 @@ app.post('/api/products/bulk', authenticateAdmin, async (req, res) => {
     catch (error) {
         console.error('Bulk update products error:', error);
         res.status(500).json({ error: 'Failed to perform bulk update', details: error.message });
+    }
+});
+// ─── ADMIN ACCOUNTS MANAGEMENT API (Super Admin Only) ───
+// List all admin users
+app.get('/api/admin/users', authenticateAdmin, async (req, res) => {
+    try {
+        if (req.adminUser?.role !== 'Super Admin') {
+            res.status(403).json({ error: 'Forbidden. Requires Super Admin role.' });
+            return;
+        }
+        const admins = await prisma.admin.findMany({
+            select: {
+                id: true,
+                username: true,
+                role: true,
+                createdAt: true,
+            },
+            orderBy: { createdAt: 'asc' },
+        });
+        res.json(admins);
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to fetch admin users', details: error.message });
+    }
+});
+// Create a new admin user
+app.post('/api/admin/users', authenticateAdmin, async (req, res) => {
+    try {
+        if (req.adminUser?.role !== 'Super Admin') {
+            res.status(403).json({ error: 'Forbidden. Requires Super Admin role.' });
+            return;
+        }
+        const { username, password, role } = req.body;
+        if (!username || !password) {
+            res.status(400).json({ error: 'Username and password are required' });
+            return;
+        }
+        const existing = await prisma.admin.findUnique({ where: { username } });
+        if (existing) {
+            res.status(400).json({ error: 'Username already exists' });
+            return;
+        }
+        const password_hash = hashPassword(password);
+        const newAdmin = await prisma.admin.create({
+            data: {
+                username: username.trim(),
+                password_hash,
+                role: role === 'Super Admin' ? 'Super Admin' : 'Admin',
+            },
+            select: {
+                id: true,
+                username: true,
+                role: true,
+                createdAt: true,
+            }
+        });
+        res.json(newAdmin);
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to create admin user', details: error.message });
+    }
+});
+// Delete an admin user
+app.delete('/api/admin/users/:id', authenticateAdmin, async (req, res) => {
+    try {
+        if (req.adminUser?.role !== 'Super Admin') {
+            res.status(403).json({ error: 'Forbidden. Requires Super Admin role.' });
+            return;
+        }
+        const id = req.params.id;
+        if (id === req.adminUser.id) {
+            res.status(400).json({ error: 'You cannot delete your own account' });
+            return;
+        }
+        await prisma.admin.delete({ where: { id } });
+        res.json({ success: true, message: 'Admin user deleted successfully' });
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to delete admin user', details: error.message });
     }
 });
 if (process.env.NODE_ENV !== 'production') {
