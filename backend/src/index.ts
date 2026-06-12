@@ -477,22 +477,33 @@ app.get('/api/settings', async (req, res) => {
 app.put('/api/settings', authenticateAdmin, async (req, res) => {
   const data = req.body;
   try {
+    const updateData: any = {
+      business_name: data.business_name,
+      whatsapp_number: data.whatsapp_number,
+      free_shipping_limit: Number(data.free_shipping_limit) || 999,
+      shipping_charge: Number(data.shipping_charge) || 0,
+      instagram_link: data.instagram_link,
+      facebook_link: data.facebook_link,
+      youtube_link: data.youtube_link,
+      address: data.address,
+      business_hours: data.business_hours,
+      business_open_time: data.business_open_time,
+      business_close_time: data.business_close_time,
+      business_days: data.business_days,
+    };
+    if (data.banner_enabled !== undefined) {
+      updateData.banner_enabled = Boolean(data.banner_enabled);
+    }
+    if (data.banner_text !== undefined) {
+      updateData.banner_text = String(data.banner_text);
+    }
+    if (data.banner_color !== undefined) {
+      updateData.banner_color = String(data.banner_color);
+    }
+
     const settings = await prisma.setting.update({
       where: { id: '1' },
-      data: {
-        business_name: data.business_name,
-        whatsapp_number: data.whatsapp_number,
-        free_shipping_limit: Number(data.free_shipping_limit) || 999,
-        shipping_charge: Number(data.shipping_charge) || 0,
-        instagram_link: data.instagram_link,
-        facebook_link: data.facebook_link,
-        youtube_link: data.youtube_link,
-        address: data.address,
-        business_hours: data.business_hours,
-        business_open_time: data.business_open_time,
-        business_close_time: data.business_close_time,
-        business_days: data.business_days,
-      },
+      data: updateData,
     });
     res.json(settings);
   } catch (error) { res.status(500).json({ error: 'Failed to update settings' }); }
@@ -806,6 +817,318 @@ app.get('/api/admin/reports/profit-loss', authenticateAdmin, async (req, res) =>
   } catch (error: any) {
     console.error('Error generating P&L report:', error);
     res.status(500).json({ error: 'Failed to generate P&L report', details: error.message });
+  }
+});
+
+// ─── ADMIN BACKUP & RESTORE API ───
+app.get('/api/admin/backup', authenticateAdmin, async (req, res) => {
+  try {
+    const data = {
+      settings: await prisma.setting.findMany(),
+      categories: await prisma.category.findMany(),
+      products: await prisma.product.findMany({ include: { variants: true } }),
+      orders: await prisma.order.findMany({ include: { items: true } }),
+      expenses: await prisma.expense.findMany(),
+      testimonials: await prisma.testimonial.findMany(),
+      deliveryZones: await prisma.deliveryZone.findMany(),
+      customerProfiles: await prisma.customerProfile.findMany(),
+    };
+    res.json(data);
+  } catch (error: any) {
+    console.error('Backup failed:', error);
+    res.status(500).json({ error: 'Backup failed: ' + error.message });
+  }
+});
+
+app.post('/api/admin/restore', authenticateAdmin, async (req, res) => {
+  const data = req.body;
+  if (!data || typeof data !== 'object') {
+    return res.status(400).json({ error: 'Invalid backup format' });
+  }
+  try {
+    await prisma.$transaction(async (tx) => {
+      // Delete in reverse order of foreign key constraints
+      await tx.orderItem.deleteMany();
+      await tx.order.deleteMany();
+      await tx.expense.deleteMany();
+      await tx.testimonial.deleteMany();
+      await tx.deliveryZone.deleteMany();
+      await tx.customerProfile.deleteMany();
+      await tx.variant.deleteMany();
+      await tx.product.deleteMany();
+      await tx.category.deleteMany();
+      await tx.setting.deleteMany();
+
+      // Restore Settings
+      if (data.settings && Array.isArray(data.settings)) {
+        for (const s of data.settings) {
+          await tx.setting.create({
+            data: {
+              id: s.id,
+              business_name: s.business_name,
+              whatsapp_number: s.whatsapp_number,
+              free_shipping_limit: Number(s.free_shipping_limit) || 999,
+              shipping_charge: Number(s.shipping_charge) || 0,
+              instagram_link: s.instagram_link || null,
+              facebook_link: s.facebook_link || null,
+              youtube_link: s.youtube_link || null,
+              address: s.address || null,
+              business_hours: s.business_hours || null,
+              business_open_time: s.business_open_time || null,
+              business_close_time: s.business_close_time || null,
+              business_days: s.business_days || 'Mon,Tue,Wed,Thu,Fri,Sat',
+              banner_enabled: s.banner_enabled !== undefined ? Boolean(s.banner_enabled) : false,
+              banner_text: s.banner_text || '',
+              banner_color: s.banner_color || 'amber',
+            }
+          });
+        }
+      }
+
+      // Restore Categories
+      if (data.categories && Array.isArray(data.categories)) {
+        for (const c of data.categories) {
+          const catData: any = {
+            id: c.id,
+            name_en: c.name_en,
+            name_te: c.name_te,
+            order: Number(c.order) || 0,
+          };
+          if (c.createdAt) catData.createdAt = new Date(c.createdAt);
+          if (c.updatedAt) catData.updatedAt = new Date(c.updatedAt);
+          await tx.category.create({ data: catData });
+        }
+      }
+
+      // Restore Products & Variants
+      if (data.products && Array.isArray(data.products)) {
+        for (const p of data.products) {
+          const prodData: any = {
+            id: p.id,
+            categoryId: p.categoryId,
+            name_en: p.name_en,
+            name_te: p.name_te,
+            description_en: p.description_en || null,
+            description_te: p.description_te || null,
+            ingredients: p.ingredients || null,
+            storage: p.storage || null,
+            shelfLife: p.shelfLife || '12 Months',
+            status: p.status || 'Available',
+            label: p.label || null,
+            spice: p.spice || 'medium',
+            gallery: p.gallery || [],
+            inventory: Number(p.inventory) || 0,
+            low_stock_threshold: Number(p.low_stock_threshold) || 10,
+            rating: p.rating !== undefined ? Number(p.rating) : 4.5,
+            reviewCount: p.reviewCount !== undefined ? Number(p.reviewCount) : 10,
+          };
+          if (p.createdAt) prodData.createdAt = new Date(p.createdAt);
+          if (p.updatedAt) prodData.updatedAt = new Date(p.updatedAt);
+
+          await tx.product.create({ data: prodData });
+
+          if (p.variants && Array.isArray(p.variants)) {
+            for (const v of p.variants) {
+              const varData: any = {
+                id: v.id,
+                productId: v.productId,
+                size: v.size,
+                packaging: v.packaging,
+                variantPrice: Number(v.variantPrice) || 0,
+                packagingCharge: Number(v.packagingCharge) || 0,
+              };
+              if (v.costPrice !== null && v.costPrice !== undefined) {
+                varData.costPrice = Number(v.costPrice);
+              }
+              await tx.variant.create({ data: varData });
+            }
+          }
+        }
+      }
+
+      // Restore Orders & Items
+      if (data.orders && Array.isArray(data.orders)) {
+        for (const o of data.orders) {
+          const ordData: any = {
+            id: o.id,
+            orderNumber: o.orderNumber || null,
+            customerName: o.customerName,
+            customerPhone: o.customerPhone,
+            customerAddress: o.customerAddress || null,
+            whatsappMessage: o.whatsappMessage || null,
+            status: o.status,
+            adminNotes: o.adminNotes || null,
+            paymentStatus: o.paymentStatus || 'Unpaid',
+            actualAmountPaid: o.actualAmountPaid !== null && o.actualAmountPaid !== undefined ? Number(o.actualAmountPaid) : null,
+          };
+          if (o.actualShippingCost !== null && o.actualShippingCost !== undefined) {
+            ordData.actualShippingCost = Number(o.actualShippingCost);
+          }
+          if (o.createdAt) ordData.createdAt = new Date(o.createdAt);
+          if (o.approvedAt) ordData.approvedAt = new Date(o.approvedAt);
+
+          await tx.order.create({ data: ordData });
+
+          if (o.items && Array.isArray(o.items)) {
+            for (const item of o.items) {
+              await tx.orderItem.create({
+                data: {
+                  id: item.id,
+                  orderId: item.orderId,
+                  productName_en: item.productName_en,
+                  productName_te: item.productName_te,
+                  variantSize: item.variantSize,
+                  variantPackaging: item.variantPackaging,
+                  quantity: Number(item.quantity) || 1,
+                  price: Number(item.price) || 0,
+                }
+              });
+            }
+          }
+        }
+      }
+
+      // Restore Expenses
+      if (data.expenses && Array.isArray(data.expenses)) {
+        for (const e of data.expenses) {
+          const expData: any = {
+            id: e.id,
+            amount: Number(e.amount) || 0,
+            category: e.category,
+            description: e.description,
+          };
+          if (e.date) expData.date = new Date(e.date);
+          if (e.createdAt) expData.createdAt = new Date(e.createdAt);
+          if (e.updatedAt) expData.updatedAt = new Date(e.updatedAt);
+
+          await tx.expense.create({ data: expData });
+        }
+      }
+
+      // Restore Testimonials
+      if (data.testimonials && Array.isArray(data.testimonials)) {
+        for (const t of data.testimonials) {
+          const testData: any = {
+            id: t.id,
+            customer_name: t.customer_name,
+            location: t.location || null,
+            text: t.text,
+            rating: Number(t.rating) || 5,
+            is_active: t.is_active !== undefined ? Boolean(t.is_active) : true,
+          };
+          if (t.createdAt) testData.createdAt = new Date(t.createdAt);
+          if (t.updatedAt) testData.updatedAt = new Date(t.updatedAt);
+
+          await tx.testimonial.create({ data: testData });
+        }
+      }
+
+      // Restore Delivery Zones
+      if (data.deliveryZones && Array.isArray(data.deliveryZones)) {
+        for (const dz of data.deliveryZones) {
+          const dzData: any = {
+            id: dz.id,
+            name: dz.name,
+            pincode: dz.pincode,
+            delivery_charge: Number(dz.delivery_charge) || 0,
+            is_active: dz.is_active !== undefined ? Boolean(dz.is_active) : true,
+          };
+          if (dz.createdAt) dzData.createdAt = new Date(dz.createdAt);
+          if (dz.updatedAt) dzData.updatedAt = new Date(dz.updatedAt);
+
+          await tx.deliveryZone.create({ data: dzData });
+        }
+      }
+
+      // Restore Customer Profiles
+      if (data.customerProfiles && Array.isArray(data.customerProfiles)) {
+        for (const cp of data.customerProfiles) {
+          const cpData: any = {
+            id: cp.id,
+            phone: cp.phone,
+            kitchenNotes: cp.kitchenNotes || null,
+          };
+          if (cp.createdAt) cpData.createdAt = new Date(cp.createdAt);
+          if (cp.updatedAt) cpData.updatedAt = new Date(cp.updatedAt);
+
+          await tx.customerProfile.create({ data: cpData });
+        }
+      }
+    });
+    res.json({ success: true, message: 'Database restored successfully' });
+  } catch (error: any) {
+    console.error('Restore failed:', error);
+    res.status(500).json({ error: 'Restore failed: ' + error.message });
+  }
+});
+
+// ─── CUSTOMER PROFILE NOTES API ───
+app.get('/api/admin/customers/profile/:phone', authenticateAdmin, async (req, res) => {
+  const phone = req.params.phone as string;
+  try {
+    const profile = await prisma.customerProfile.findUnique({ where: { phone } });
+    res.json(profile || { phone, kitchenNotes: '' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to fetch customer profile' });
+  }
+});
+
+app.post('/api/admin/customers/profile/:phone', authenticateAdmin, async (req, res) => {
+  const phone = req.params.phone as string;
+  const { kitchenNotes } = req.body;
+  try {
+    const profile = await prisma.customerProfile.upsert({
+      where: { phone },
+      update: { kitchenNotes: kitchenNotes || null },
+      create: { phone, kitchenNotes: kitchenNotes || null },
+    });
+    res.json(profile);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to update customer profile' });
+  }
+});
+
+// ─── BULK PRODUCT UPDATE API (Spreadsheet Bulk Editor) ───
+app.post('/api/products/bulk', authenticateAdmin, async (req, res) => {
+  const { updates } = req.body;
+  if (!updates || !Array.isArray(updates)) {
+    return res.status(400).json({ error: 'Invalid updates body. Expected { updates: [...] }' });
+  }
+  try {
+    await prisma.$transaction(
+      updates.map((prodUpdate: any) => {
+        const prodData: any = {};
+        if (prodUpdate.inventory !== undefined) {
+          prodData.inventory = Number(prodUpdate.inventory);
+        }
+        if (prodUpdate.shelfLife !== undefined) {
+          prodData.shelfLife = prodUpdate.shelfLife;
+        }
+
+        const productUpdatePromise = prisma.product.update({
+          where: { id: prodUpdate.id },
+          data: prodData,
+        });
+
+        const variantUpdatePromises = (prodUpdate.variants || []).map((vUpdate: any) => {
+          const varData: any = {};
+          if (vUpdate.variantPrice !== undefined) varData.variantPrice = Number(vUpdate.variantPrice);
+          if (vUpdate.costPrice !== undefined) varData.costPrice = Number(vUpdate.costPrice);
+          if (vUpdate.packagingCharge !== undefined) varData.packagingCharge = Number(vUpdate.packagingCharge);
+
+          return prisma.variant.update({
+            where: { id: vUpdate.id },
+            data: varData,
+          });
+        });
+
+        return [productUpdatePromise, ...variantUpdatePromises];
+      }).flat()
+    );
+    res.json({ success: true, message: 'Products and variants updated successfully' });
+  } catch (error: any) {
+    console.error('Bulk update products error:', error);
+    res.status(500).json({ error: 'Failed to perform bulk update', details: error.message });
   }
 });
 

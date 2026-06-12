@@ -33,11 +33,16 @@ export function AdminLogin() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/5 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="font-headline text-3xl font-bold text-primary">
+        <div className="text-center mb-6">
+          <img
+            src="/logo.png"
+            alt="Neralla Inti Ruchulu Logo"
+            className="h-16 w-16 mx-auto object-contain rounded-full shadow-md mb-3"
+          />
+          <h1 className="font-headline text-2xl font-bold text-primary leading-tight">
             Neralla Inti Ruchulu
           </h1>
-          <p className="text-muted-foreground mt-1 text-sm">Admin Dashboard</p>
+          <p className="text-muted-foreground mt-1.5 text-xs">Premium Andhra Home Foods · Admin Panel</p>
         </div>
 
         <div className="bg-card rounded-2xl border border-border/50 shadow-xl p-8">

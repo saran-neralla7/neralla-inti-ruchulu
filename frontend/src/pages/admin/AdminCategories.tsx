@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -58,6 +58,38 @@ export function AdminCategories() {
     },
   });
 
+  // Category sorting swap mutation
+  const moveMutation = useMutation({
+    mutationFn: async ({ catA, catB }: { catA: Category; catB: Category }) => {
+      await Promise.all([
+        api.put(`/categories/${catA.id}`, { name_en: catA.name_en, name_te: catA.name_te, order: catA.order }),
+        api.put(`/categories/${catB.id}`, { name_en: catB.name_en, name_te: catB.name_te, order: catB.order }),
+      ]);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+    }
+  });
+
+  const handleMove = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= categories.length) return;
+    
+    const catA = categories[index];
+    const catB = categories[targetIndex];
+    
+    let orderA = catB.order;
+    let orderB = catA.order;
+    if (orderA === orderB) {
+      orderA = direction === 'up' ? catB.order - 1 : catB.order + 1;
+    }
+    
+    moveMutation.mutate({
+      catA: { ...catA, order: orderA },
+      catB: { ...catB, order: orderB }
+    });
+  };
+
   const resetForm = () => {
     setNameEN('');
     setNameTE('');
@@ -104,10 +136,11 @@ export function AdminCategories() {
 
   return (
     <div className="p-6 md:p-8 max-w-4xl mx-auto">
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="font-headline text-2xl font-bold text-foreground">Categories</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{categories.length} categories</p>
+          <p className="text-sm text-muted-foreground mt-0.5">{categories.length} categories total</p>
         </div>
         <Button onClick={() => setShowForm(true)} className="bg-primary hover:bg-primary/90 text-white rounded-xl gap-2">
           <Plus className="h-4 w-4" /> Add Category
@@ -158,47 +191,129 @@ export function AdminCategories() {
           <p className="text-muted-foreground text-sm">Loading categories...</p>
         </div>
       ) : (
-        <div className="bg-card border border-border/50 rounded-2xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/30 border-b border-border/40">
-              <tr>
-                {['#', 'Category (EN)', 'Category (TE)', 'Actions'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/30">
-              {categories.map((cat) => (
-                <tr key={cat.id} className="hover:bg-muted/20 transition-colors">
-                  <td className="px-4 py-3 text-muted-foreground">{cat.order}</td>
-                  <td className="px-4 py-3 font-medium text-foreground">{cat.name_en}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{cat.name_te}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1.5">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(cat)}
-                        className="h-8 w-8 hover:text-primary"
-                      >
-                        <Edit2 className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 hover:text-destructive"
-                        onClick={() => handleDelete(cat.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </td>
+        <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm animate-in fade-in duration-200">
+          
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/30 border-b border-border/40">
+                <tr>
+                  {['Sort', '#', 'Category (EN)', 'Category (TE)', 'Actions'].map((h) => (
+                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      {h}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-border/30">
+                {categories.map((cat, idx) => (
+                  <tr key={cat.id} className="hover:bg-muted/20 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleMove(idx, 'up')}
+                          disabled={idx === 0 || moveMutation.isPending}
+                          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                          title="Move Up"
+                        >
+                          <ArrowUp className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleMove(idx, 'down')}
+                          disabled={idx === categories.length - 1 || moveMutation.isPending}
+                          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                          title="Move Down"
+                        >
+                          <ArrowDown className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{cat.order}</td>
+                    <td className="px-4 py-3 font-medium text-foreground">{cat.name_en}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{cat.name_te}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEdit(cat)}
+                          className="h-8 w-8 hover:text-primary hover:bg-primary/5"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 hover:text-destructive hover:bg-destructive/5"
+                          onClick={() => handleDelete(cat.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Cards View */}
+          <div className="block md:hidden divide-y divide-border/30">
+            {categories.map((cat, idx) => (
+              <div key={cat.id} className="p-4 flex items-center justify-between gap-4 hover:bg-muted/10 transition-colors">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded-full">
+                      #{cat.order}
+                    </span>
+                    <p className="font-bold text-foreground text-sm">{cat.name_en}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground font-telugu pl-8">{cat.name_te}</p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-col gap-0.5">
+                    <button
+                      onClick={() => handleMove(idx, 'up')}
+                      disabled={idx === 0 || moveMutation.isPending}
+                      className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none transition-colors border border-border/30"
+                      title="Move Up"
+                    >
+                      <ArrowUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleMove(idx, 'down')}
+                      disabled={idx === categories.length - 1 || moveMutation.isPending}
+                      className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none transition-colors border border-border/30"
+                      title="Move Down"
+                    >
+                      <ArrowDown className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="flex gap-0.5 border-l border-border/30 pl-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEdit(cat)}
+                      className="h-8 w-8 hover:text-primary"
+                    >
+                      <Edit2 className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 hover:text-destructive"
+                      onClick={() => handleDelete(cat.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
         </div>
       )}
     </div>

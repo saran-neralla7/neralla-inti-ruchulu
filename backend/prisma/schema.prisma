@@ -104,6 +104,9 @@ model Setting {
   business_open_time  String?
   business_close_time String?
   business_days       String?  @default("Mon,Tue,Wed,Thu,Fri,Sat")
+  banner_enabled      Boolean  @default(false)
+  banner_text         String   @default("")
+  banner_color        String   @default("amber")
   updatedAt           DateTime @updatedAt
 }
 
@@ -136,5 +139,13 @@ model Expense {
   date        DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model CustomerProfile {
+  id           String   @id @default(cuid())
+  phone        String   @unique
+  kitchenNotes String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 

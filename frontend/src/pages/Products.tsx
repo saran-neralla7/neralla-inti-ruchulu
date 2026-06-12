@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Search, SlidersHorizontal, Leaf, X } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { ProductCard } from '@/components/ProductCard';
@@ -11,6 +11,7 @@ import { getProductSpiceLevel } from '@/lib/utils';
 export function Products() {
   const { i18n } = useTranslation();
   const location = useLocation();
+  const navigate = useNavigate();
   const isTE = i18n.language === 'te';
 
   // State filters
@@ -29,6 +30,19 @@ export function Products() {
       return res.data;
     },
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const productName = params.get('product');
+    if (productName && products.length > 0) {
+      const match = products.find(
+        (p) => p.name_en.toLowerCase() === productName.toLowerCase()
+      );
+      if (match) {
+        navigate(`/products/${match.id}`);
+      }
+    }
+  }, [products, navigate]);
 
   // Fetch categories from backend
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<Category[]>({

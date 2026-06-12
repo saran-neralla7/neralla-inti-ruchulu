@@ -226,75 +226,139 @@ export function AdminDeliveryZones() {
         </div>
       </div>
 
-      {/* Zones Table */}
-      <div className="bg-white border border-zinc-100 rounded-2xl shadow-sm overflow-hidden">
+      {/* Zones List Container */}
+      <div className="bg-white border border-zinc-100 rounded-2xl shadow-sm overflow-hidden animate-in fade-in duration-200">
         {zones.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-zinc-50 border-b border-zinc-100">
-                  <th className="px-6 py-4 text-xs font-semibold uppercase text-zinc-400 tracking-wider">Zone Name</th>
-                  <th className="px-6 py-4 text-xs font-semibold uppercase text-zinc-400 tracking-wider">Pincode</th>
-                  <th className="px-6 py-4 text-xs font-semibold uppercase text-zinc-400 tracking-wider text-right">Delivery Charge</th>
-                  <th className="px-6 py-4 text-xs font-semibold uppercase text-zinc-400 tracking-wider text-center">Status</th>
-                  <th className="px-6 py-4 text-xs font-semibold uppercase text-zinc-400 tracking-wider text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {zones.map((zone) => (
-                  <tr key={zone.id} className="hover:bg-zinc-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-zinc-900 flex items-center gap-1.5">
+          <>
+            {/* Desktop Table View */}
+            <div className="overflow-x-auto hidden md:block">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-zinc-50 border-b border-zinc-100">
+                    <th className="px-6 py-4 text-xs font-semibold uppercase text-zinc-400 tracking-wider">Zone Name</th>
+                    <th className="px-6 py-4 text-xs font-semibold uppercase text-zinc-400 tracking-wider">Pincode</th>
+                    <th className="px-6 py-4 text-xs font-semibold uppercase text-zinc-400 tracking-wider text-right">Delivery Charge</th>
+                    <th className="px-6 py-4 text-xs font-semibold uppercase text-zinc-400 tracking-wider text-center">Status</th>
+                    <th className="px-6 py-4 text-xs font-semibold uppercase text-zinc-400 tracking-wider text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {zones.map((zone) => (
+                    <tr key={zone.id} className="hover:bg-zinc-50/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="font-semibold text-zinc-900 flex items-center gap-1.5">
+                          <MapPin className="h-4 w-4 text-zinc-400" />
+                          {zone.name}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm font-mono text-zinc-600">
+                        {zone.pincode}
+                      </td>
+                      <td className="px-6 py-4 text-right text-sm font-bold">
+                        {zone.delivery_charge === 0 ? (
+                          <span className="text-emerald-600">Free</span>
+                        ) : (
+                          <span className="text-zinc-950">₹{zone.delivery_charge}</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <button
+                          onClick={() => toggleMutation.mutate(zone)}
+                          className={`inline-flex items-center gap-1 p-1 rounded-full hover:bg-zinc-100 active:scale-95 transition-all text-sm`}
+                          title={zone.is_active ? 'Click to deactivate' : 'Click to activate'}
+                        >
+                          {zone.is_active ? (
+                            <ToggleRight className="h-8 w-8 text-primary" />
+                          ) : (
+                            <ToggleLeft className="h-8 w-8 text-zinc-300" />
+                          )}
+                        </button>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleOpenEditForm(zone)}
+                            className="p-2 text-zinc-500 hover:text-primary hover:bg-zinc-50 rounded-xl transition-colors"
+                            title="Edit"
+                          >
+                            <Edit2 className="h-4.5 w-4.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(zone)}
+                            className="p-2 text-zinc-500 hover:text-destructive hover:bg-destructive/5 rounded-xl transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4.5 w-4.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards View */}
+            <div className="block md:hidden divide-y divide-zinc-100">
+              {zones.map((zone) => (
+                <div key={zone.id} className="p-4 space-y-3 hover:bg-zinc-50/50 transition-colors">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="font-semibold text-zinc-955 text-sm flex items-center gap-1">
                         <MapPin className="h-4 w-4 text-zinc-400" />
                         {zone.name}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm font-mono text-zinc-600">
-                      {zone.pincode}
-                    </td>
-                    <td className="px-6 py-4 text-right text-sm font-bold">
+                      <p className="text-xs text-zinc-500 font-mono mt-0.5">{zone.pincode}</p>
+                    </div>
+                    <span className="text-xs font-bold">
                       {zone.delivery_charge === 0 ? (
-                        <span className="text-emerald-600">Free</span>
+                        <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">Free</span>
                       ) : (
-                        <span className="text-zinc-950">₹{zone.delivery_charge}</span>
+                        <span className="text-zinc-950 bg-zinc-50 px-2 py-0.5 rounded-full border border-zinc-100 font-mono">₹{zone.delivery_charge}</span>
                       )}
-                    </td>
-                    <td className="px-6 py-4 text-center">
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-2 border-t border-zinc-100/50">
+                    <button
+                      onClick={() => toggleMutation.mutate(zone)}
+                      className="inline-flex items-center gap-1.5 text-xs text-zinc-500 font-semibold"
+                      title={zone.is_active ? 'Deactivate' : 'Activate'}
+                    >
+                      {zone.is_active ? (
+                        <>
+                          <ToggleRight className="h-6 w-6 text-primary" />
+                          <span>Active</span>
+                        </>
+                      ) : (
+                        <>
+                          <ToggleLeft className="h-6 w-6 text-zinc-300" />
+                          <span>Inactive</span>
+                        </>
+                      )}
+                    </button>
+
+                    <div className="flex gap-1.5">
                       <button
-                        onClick={() => toggleMutation.mutate(zone)}
-                        className={`inline-flex items-center gap-1 p-1 rounded-full hover:bg-zinc-100 active:scale-95 transition-all text-sm`}
-                        title={zone.is_active ? 'Click to deactivate' : 'Click to activate'}
+                        onClick={() => handleOpenEditForm(zone)}
+                        className="p-1.5 text-zinc-500 hover:text-primary hover:bg-zinc-50 rounded-lg transition-colors border border-border/30"
+                        title="Edit"
                       >
-                        {zone.is_active ? (
-                          <ToggleRight className="h-8 w-8 text-primary" />
-                        ) : (
-                          <ToggleLeft className="h-8 w-8 text-zinc-300" />
-                        )}
+                        <Edit2 className="h-4 w-4" />
                       </button>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleOpenEditForm(zone)}
-                          className="p-2 text-zinc-500 hover:text-primary hover:bg-zinc-50 rounded-xl transition-colors"
-                          title="Edit"
-                        >
-                          <Edit2 className="h-4.5 w-4.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(zone)}
-                          className="p-2 text-zinc-500 hover:text-destructive hover:bg-destructive/5 rounded-xl transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4.5 w-4.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      <button
+                        onClick={() => handleDelete(zone)}
+                        className="p-1.5 text-zinc-500 hover:text-destructive hover:bg-destructive/5 rounded-lg transition-colors border border-border/30"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         ) : (
           <div className="flex flex-col items-center justify-center py-16 text-zinc-400">
             <MapPin className="h-12 w-12 text-zinc-200 mb-3" />
@@ -308,7 +372,7 @@ export function AdminDeliveryZones() {
       {isFormOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex justify-end">
           <div 
-            className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col justify-between animate-slide-left p-6 md:p-8"
+            className="w-full sm:max-w-md bg-white h-full shadow-2xl flex flex-col justify-between animate-slide-left p-6"
           >
             {/* Header */}
             <div>
@@ -343,7 +407,7 @@ export function AdminDeliveryZones() {
                     placeholder="e.g. Tenali Local"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-zinc-200 bg-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    className="w-full px-3.5 py-2.5 border border-zinc-200 bg-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-semibold text-zinc-950"
                   />
                 </div>
 
@@ -358,7 +422,7 @@ export function AdminDeliveryZones() {
                     placeholder="e.g. 522201"
                     value={pincode}
                     onChange={(e) => setPincode(e.target.value.replace(/[^0-9]/g, ''))}
-                    className="w-full px-3.5 py-2.5 border border-zinc-200 bg-white rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    className="w-full px-3.5 py-2.5 border border-zinc-200 bg-white rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-semibold"
                   />
                 </div>
 
@@ -375,7 +439,7 @@ export function AdminDeliveryZones() {
                       placeholder="0 for free shipping"
                       value={charge}
                       onChange={(e) => setCharge(e.target.value)}
-                      className="w-full pl-8 pr-3.5 py-2.5 border border-zinc-200 bg-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      className="w-full pl-8 pr-3.5 py-2.5 border border-zinc-200 bg-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-bold text-primary"
                     />
                   </div>
                   <p className="text-[10px] text-zinc-400 mt-1">Set to 0 to make shipping free for this pincode.</p>

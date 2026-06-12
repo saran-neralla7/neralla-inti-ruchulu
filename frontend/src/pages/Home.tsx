@@ -1,7 +1,8 @@
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Star, Leaf, Heart, Truck } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ProductCard } from '@/components/ProductCard';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -77,6 +78,7 @@ const CATEGORIES_SHOWCASE = [
 export function Home() {
   const { t, i18n } = useTranslation();
   const isTE = i18n.language === 'te';
+  const navigate = useNavigate();
 
   // Dynamic Query for Products
   const { data: products = [], isLoading } = useQuery<Product[]>({
@@ -86,6 +88,19 @@ export function Home() {
       return res.data;
     },
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const productName = params.get('product');
+    if (productName && products.length > 0) {
+      const match = products.find(
+        (p) => p.name_en.toLowerCase() === productName.toLowerCase()
+      );
+      if (match) {
+        navigate(`/products/${match.id}`);
+      }
+    }
+  }, [products, navigate]);
 
   const displayProducts = products.length > 0
     ? products.filter(p => p.status === 'Available').slice(0, 3)

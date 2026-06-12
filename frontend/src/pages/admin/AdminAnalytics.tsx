@@ -13,8 +13,11 @@ import {
   TrendingDown,
   ArrowUpRight,
   ArrowDownRight,
-  Filter
+  Filter,
+  MessageSquare,
+  Check
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
   LineChart,
   Line,
@@ -85,6 +88,9 @@ export function AdminAnalytics() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
+  // Copy status for P&L share
+  const [copiedPL, setCopiedPL] = useState(false);
+
   // Fetch sales overview
   const { data: overview, isLoading: isOverviewLoading } = useQuery<Overview>({
     queryKey: ['analytics-overview'],
@@ -130,7 +136,7 @@ export function AdminAnalytics() {
 
   if (isLoading) {
     return (
-      <div className="p-8 space-y-6 animate-pulse">
+      <div className="p-8 space-y-6 animate-pulse max-w-4xl mx-auto">
         <div className="h-8 w-48 bg-zinc-200 rounded" />
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -255,6 +261,28 @@ export function AdminAnalytics() {
     }
   };
 
+  const handleSharePLSummary = () => {
+    if (!plReport) return;
+    
+    const summary = plReport.summary;
+    const startStr = startDate ? new Date(startDate).toLocaleDateString('en-IN') : 'Beginning';
+    const endStr = endDate ? new Date(endDate).toLocaleDateString('en-IN') : 'Present';
+    
+    const totalOutflow = summary.totalCogs + summary.totalActualShippingCost + summary.gatewayFees + summary.totalExpenses;
+    
+    const text = `📊 *NERALLA INTI RUCHULU - P&L STATEMENT* 📊\n📅 *Period:* ${startStr} to ${endStr}\n\n🟢 *INFLOW (Revenue):*\n- Product Sales: ₹${summary.grossRevenue.toLocaleString('en-IN')}\n- Shipping Fees: ₹${summary.shippingCollected.toLocaleString('en-IN')}\n*Total Inflow (A):* ₹${summary.totalInflow.toLocaleString('en-IN')}\n\n🔴 *OUTFLOW (Costs):*\n- COGS (Ingredients): ₹${summary.totalCogs.toLocaleString('en-IN')}\n- Courier Shipping: ₹${summary.totalActualShippingCost.toLocaleString('en-IN')}\n- Payment Gateway Fees: ₹${summary.gatewayFees.toLocaleString('en-IN')}\n- Bulk Expenses: ₹${summary.totalExpenses.toLocaleString('en-IN')}\n*Total Outflow (B):* ₹${totalOutflow.toLocaleString('en-IN')}\n\n💰 *NET PROFIT (A - B):* ₹${summary.netProfit.toLocaleString('en-IN')}\n📈 *NET MARGIN:* ${summary.netProfitMargin.toFixed(1)}%\n\nShared from Admin Panel.`;
+    
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedPL(true);
+      setTimeout(() => setCopiedPL(false), 2000);
+      
+      const encoded = encodeURIComponent(text);
+      window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
+    }).catch(err => {
+      console.error('Copy/Share failed:', err);
+    });
+  };
+
   return (
     <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
@@ -275,7 +303,7 @@ export function AdminAnalytics() {
             className={cn(
               'px-4 py-2 text-xs font-semibold rounded-lg transition-all',
               activeTab === 'sales'
-                ? 'bg-card text-foreground shadow-sm'
+                ? 'bg-white shadow-sm text-foreground'
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
@@ -286,7 +314,7 @@ export function AdminAnalytics() {
             className={cn(
               'px-4 py-2 text-xs font-semibold rounded-lg transition-all',
               activeTab === 'pl'
-                ? 'bg-card text-foreground shadow-sm'
+                ? 'bg-white shadow-sm text-foreground'
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
@@ -297,7 +325,7 @@ export function AdminAnalytics() {
 
       {/* Pending Banner Alert */}
       {overview && overview.pendingOrders > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3 text-amber-800">
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3 text-amber-800 animate-in fade-in duration-200">
           <AlertCircle className="h-5 w-5 text-amber-500 shrink-0" />
           <div className="flex-1 text-sm font-medium">
             There are <span className="font-bold">{overview.pendingOrders} pending approval</span> orders. Approve them to include their metrics in the totals.
@@ -450,7 +478,7 @@ export function AdminAnalytics() {
                   type="date"
                   value={startDate}
                   onChange={e => setStartDate(e.target.value)}
-                  className="px-3 py-1.5 rounded-lg border border-border text-xs bg-background"
+                  className="px-3 py-1.5 rounded-lg border border-border text-xs bg-background focus:outline-none"
                 />
               </div>
               <div className="space-y-1">
@@ -459,25 +487,25 @@ export function AdminAnalytics() {
                   type="date"
                   value={endDate}
                   onChange={e => setEndDate(e.target.value)}
-                  className="px-3 py-1.5 rounded-lg border border-border text-xs bg-background"
+                  className="px-3 py-1.5 rounded-lg border border-border text-xs bg-background focus:outline-none"
                 />
               </div>
               <div className="flex gap-1.5 md:self-end pt-5 md:pt-0">
                 <button
                   onClick={() => handleQuickDateFilter('this-month')}
-                  className="px-2.5 py-1.5 rounded-lg bg-secondary text-secondary-foreground text-xs font-semibold hover:bg-secondary/80 transition-colors border border-border/30"
+                  className="px-2.5 py-1.5 rounded-lg bg-[#fff1ed] text-primary text-xs font-semibold hover:bg-primary/10 transition-colors border border-primary/10"
                 >
                   This Month
                 </button>
                 <button
                   onClick={() => handleQuickDateFilter('last-30')}
-                  className="px-2.5 py-1.5 rounded-lg bg-secondary text-secondary-foreground text-xs font-semibold hover:bg-secondary/80 transition-colors border border-border/30"
+                  className="px-2.5 py-1.5 rounded-lg bg-[#fff1ed] text-primary text-xs font-semibold hover:bg-primary/10 transition-colors border border-primary/10"
                 >
                   Last 30 Days
                 </button>
                 <button
                   onClick={() => handleQuickDateFilter('lifetime')}
-                  className="px-2.5 py-1.5 rounded-lg bg-secondary text-secondary-foreground text-xs font-semibold hover:bg-secondary/80 transition-colors border border-border/30"
+                  className="px-2.5 py-1.5 rounded-lg bg-[#fff1ed] text-primary text-xs font-semibold hover:bg-primary/10 transition-colors border border-primary/10"
                 >
                   Clear
                 </button>
@@ -534,9 +562,19 @@ export function AdminAnalytics() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             {/* Left Column: P&L Statement Grid */}
             <div className="bg-card border border-border/60 rounded-2xl shadow-sm p-6 space-y-6">
-              <div>
-                <h2 className="font-headline font-bold text-base text-zinc-950">Profit & Loss Statement</h2>
-                <p className="text-xs text-muted-foreground">Detailed balance list of income and expenses</p>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <h2 className="font-headline font-bold text-base text-zinc-950">Profit & Loss Statement</h2>
+                  <p className="text-xs text-muted-foreground">Detailed balance list of income and expenses</p>
+                </div>
+                <Button
+                  onClick={handleSharePLSummary}
+                  className="bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs h-9 px-3.5 flex items-center gap-1.5 shadow-sm transition-all"
+                  title="Share monthly P&L summary on WhatsApp"
+                >
+                  {copiedPL ? <Check className="h-3.5 w-3.5" /> : <MessageSquare className="h-3.5 w-3.5" />}
+                  {copiedPL ? 'Copied & Shared!' : 'Share P&L Summary'}
+                </Button>
               </div>
 
               <div className="space-y-4 text-sm font-medium">

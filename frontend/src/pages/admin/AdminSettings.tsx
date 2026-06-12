@@ -6,8 +6,10 @@ import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {
   User, Lock, Smartphone, Info, Download, CheckCircle2,
-  Shield, Globe, Store, Clock, Save, Check, AlertCircle, Link as LinkIcon
+  Shield, Globe, Store, Clock, Save, Check, AlertCircle, Link as LinkIcon,
+  Megaphone, Database, Upload, RefreshCw
 } from 'lucide-react';
+import { useModalStore } from '@/store/modalStore';
 
 interface SettingsData {
   id: string;
@@ -22,15 +24,21 @@ interface SettingsData {
   business_open_time: string | null;
   business_close_time: string | null;
   business_days: string | null;
+  banner_enabled: boolean;
+  banner_text: string;
+  banner_color: string;
 }
 
 export function AdminSettings() {
   const queryClient = useQueryClient();
   const { user } = useAdminStore();
   const { isInstallable, installApp } = usePWAInstall();
+  const { showConfirm, showAlert } = useModalStore();
+  
   const [installed, setInstalled] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [restoring, setRestoring] = useState(false);
 
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
 
@@ -58,6 +66,11 @@ export function AdminSettings() {
   const [closeTime, setCloseTime] = useState('20:00');
   const [workingDays, setWorkingDays] = useState<string[]>(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
 
+  // Storefront Banner State
+  const [bannerEnabled, setBannerEnabled] = useState(false);
+  const [bannerText, setBannerText] = useState('');
+  const [bannerColor, setBannerColor] = useState('amber');
+
   // Sync state with fetched settings
   useEffect(() => {
     if (settings) {
@@ -71,6 +84,9 @@ export function AdminSettings() {
       setYoutube(settings.youtube_url || '');
       setOpenTime(settings.business_open_time || '09:00');
       setCloseTime(settings.business_close_time || '20:00');
+      setBannerEnabled(settings.banner_enabled || false);
+      setBannerText(settings.banner_text || '');
+      setBannerColor(settings.banner_color || 'amber');
       
       if (settings.business_days) {
         setWorkingDays(settings.business_days.split(',').map(d => d.trim()));
@@ -135,8 +151,88 @@ export function AdminSettings() {
       youtube_url: youtube.trim() || null,
       business_open_time: openTime,
       business_close_time: closeTime,
-      business_days: workingDays.join(',')
+      business_days: workingDays.join(','),
+      banner_enabled: bannerEnabled,
+      banner_text: bannerText.trim(),
+      banner_color: bannerColor,
     });
+  };
+
+  // 1-Click Backup Database
+  const handleBackup = async () => {
+    try {
+      const res = await api.get('/admin/backup');
+      const dataStr = JSON.stringify(res.data, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `neralla_inti_ruchulu_backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      console.error(error);
+      showAlert({
+        title: 'Backup Failed',
+        description: error.response?.data?.error || error.message || 'Failed to download database backup.',
+      });
+    }
+  };
+
+  // 1-Click Restore Database
+  const handleRestore = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    showConfirm({
+      title: '⚠️ Restore Database?',
+      description: 'WARNING: Restoring the database will OVERWRITE all current settings, categories, products, orders, expenses, and reviews. This action cannot be undone. Are you absolutely sure?',
+      confirmText: 'Yes, Overwrite & Restore',
+      cancelText: 'Cancel',
+      isDestructive: true,
+      onConfirm: async () => {
+        setRestoring(true);
+        try {
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            try {
+              const text = e.target?.result;
+              if (typeof text !== 'string') throw new Error('Failed to read backup file');
+              const json = JSON.parse(text);
+              const res = await api.post('/admin/restore', json);
+              if (res.data.success) {
+                queryClient.invalidateQueries();
+                showAlert({
+                  title: 'Database Restored',
+                  description: 'Database backup restored successfully. The page will reload.',
+                });
+                setTimeout(() => window.location.reload(), 2000);
+              }
+            } catch (err: any) {
+              console.error(err);
+              showAlert({
+                title: 'Restore Failed',
+                description: err.response?.data?.error || err.message || 'Invalid backup JSON file or API restore error.',
+              });
+            } finally {
+              setRestoring(false);
+            }
+          };
+          reader.readAsText(file);
+        } catch (error: any) {
+          console.error(error);
+          showAlert({
+            title: 'Restore Failed',
+            description: error.message || 'Failed to process the backup file.',
+          });
+          setRestoring(false);
+        }
+      }
+    });
+    // Reset file input
+    event.target.value = '';
   };
 
   if (isLoading) {
@@ -163,7 +259,7 @@ export function AdminSettings() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-zinc-100 pb-5">
         <div>
           <h1 className="font-headline text-2xl md:text-3xl font-bold text-foreground">Settings</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Manage your shop metadata, operational hours, shipping, and PWA setup.</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Manage your shop metadata, announcement banner, backup database, and PWA setup.</p>
         </div>
         <Button
           onClick={handleSaveSettings}
@@ -183,7 +279,7 @@ export function AdminSettings() {
       )}
 
       <div className="grid grid-cols-1 gap-8">
-        {/* 1. Business Profile Settings */}
+        {/* 1. Storefront & Shipping */}
         <div className="bg-white rounded-2xl border border-zinc-100 p-6 space-y-6 shadow-sm">
           <div className="flex items-center gap-2 border-b border-zinc-50 pb-4">
             <Store className="h-5 w-5 text-primary" />
@@ -222,7 +318,7 @@ export function AdminSettings() {
                 min={0}
                 value={shippingCharge}
                 onChange={(e) => setShippingCharge(e.target.value)}
-                className="w-full px-3.5 py-2.5 border border-zinc-200 bg-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                className="w-full px-3.5 py-2.5 border border-zinc-200 bg-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium"
               />
             </div>
 
@@ -234,7 +330,7 @@ export function AdminSettings() {
                 min={0}
                 value={freeShippingLimit}
                 onChange={(e) => setFreeShippingLimit(e.target.value)}
-                className="w-full px-3.5 py-2.5 border border-zinc-200 bg-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                className="w-full px-3.5 py-2.5 border border-zinc-200 bg-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium"
               />
             </div>
 
@@ -251,7 +347,62 @@ export function AdminSettings() {
           </div>
         </div>
 
-        {/* 2. Business Hours Settings */}
+        {/* 2. Storefront Announcement Banner (Option 4) */}
+        <div className="bg-white rounded-2xl border border-zinc-100 p-6 space-y-6 shadow-sm animate-in fade-in duration-200">
+          <div className="flex items-center gap-2 border-b border-zinc-50 pb-4">
+            <Megaphone className="h-5 w-5 text-primary" />
+            <h2 className="font-headline font-semibold text-base text-zinc-950">Storefront Announcement Banner</h2>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 bg-zinc-50 rounded-xl border border-zinc-100">
+              <div>
+                <label className="text-sm font-semibold text-zinc-900 block">Enable Announcement Banner</label>
+                <span className="text-xs text-zinc-500 block">Show a top alert banner ticker to customers visiting the website.</span>
+              </div>
+              <input
+                type="checkbox"
+                checked={bannerEnabled}
+                onChange={(e) => setBannerEnabled(e.target.checked)}
+                className="h-5.5 w-10 border-zinc-300 rounded-full text-primary focus:ring-primary bg-zinc-200 cursor-pointer accent-primary"
+              />
+            </div>
+
+            {bannerEnabled && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top-1 duration-200">
+                <div className="md:col-span-2 space-y-1.5">
+                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Banner Text Content</label>
+                  <input
+                    type="text"
+                    required={bannerEnabled}
+                    placeholder="e.g. Free shipping on orders above ₹999! fresh batch sun-drying now."
+                    value={bannerText}
+                    onChange={(e) => setBannerText(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-zinc-200 bg-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium"
+                  />
+                </div>
+                
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Banner Background Color</label>
+                  <select
+                    value={bannerColor}
+                    onChange={(e) => setBannerColor(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-zinc-200 bg-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-semibold"
+                  >
+                    <option value="amber">Gold / Amber (శిఖరం)</option>
+                    <option value="red">Red / Hot (ఆంధ్రా హార్ట్)</option>
+                    <option value="green">Green / Fresh (తాజా)</option>
+                    <option value="blue">Blue / Standard (నీలం)</option>
+                    <option value="indigo">Indigo / Special (ఇండిగో)</option>
+                    <option value="purple">Purple / Royal (రాయల్)</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 3. Business Hours Settings */}
         <div className="bg-white rounded-2xl border border-zinc-100 p-6 space-y-6 shadow-sm">
           <div className="flex items-center gap-2 border-b border-zinc-50 pb-4">
             <Clock className="h-5 w-5 text-primary" />
@@ -285,7 +436,8 @@ export function AdminSettings() {
                 {weekDays.map(day => {
                   const isChecked = workingDays.includes(day);
                   return (
-                    <label 
+                    <button 
+                      type="button"
                       key={day}
                       onClick={() => handleDayToggle(day)}
                       className={`flex items-center justify-center p-2.5 border rounded-xl cursor-pointer text-xs font-semibold select-none transition-all active:scale-95 ${
@@ -294,14 +446,8 @@ export function AdminSettings() {
                           : 'border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-500'
                       }`}
                     >
-                      <input 
-                        type="checkbox" 
-                        className="hidden" 
-                        checked={isChecked}
-                        readOnly 
-                      />
                       {day}
-                    </label>
+                    </button>
                   );
                 })}
               </div>
@@ -312,7 +458,7 @@ export function AdminSettings() {
           </div>
         </div>
 
-        {/* 3. Social Media Links */}
+        {/* 4. Social Media Links */}
         <div className="bg-white rounded-2xl border border-zinc-100 p-6 space-y-6 shadow-sm">
           <div className="flex items-center gap-2 border-b border-zinc-50 pb-4">
             <LinkIcon className="h-5 w-5 text-primary" />
@@ -355,7 +501,62 @@ export function AdminSettings() {
           </div>
         </div>
 
-        {/* 4. Account Settings */}
+        {/* 5. Database Backup & Restore (Option A) */}
+        <div className="bg-white rounded-2xl border border-zinc-100 p-6 space-y-5 shadow-sm animate-in fade-in duration-200">
+          <div className="flex items-center gap-2 border-b border-zinc-50 pb-4">
+            <Database className="h-5 w-5 text-primary" />
+            <h2 className="font-headline font-semibold text-base text-zinc-950">Database Backup & Offline Restore</h2>
+          </div>
+
+          <div className="space-y-4">
+            <div className="p-4 bg-zinc-50 border border-zinc-100 rounded-xl flex items-start gap-3.5">
+              <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-zinc-900">Zero Data Loss Management</p>
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  Export a snapshot of all settings, categories, products, orders, expenses, and review testimonials to a local JSON file. 
+                  In case of accidental deletion, you can upload this backup file to completely restore your store data.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4 pt-2">
+              <Button
+                type="button"
+                onClick={handleBackup}
+                className="bg-primary hover:bg-primary/95 text-white rounded-xl px-5 h-11 font-semibold flex items-center justify-center gap-2 flex-1 shadow-sm"
+              >
+                <Download className="h-4 w-4" />
+                Download JSON Backup
+              </Button>
+
+              <div className="relative flex-1">
+                <input
+                  type="file"
+                  accept="application/json"
+                  onChange={handleRestore}
+                  disabled={restoring}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={restoring}
+                  className="w-full border-zinc-200 hover:bg-zinc-50 text-zinc-700 rounded-xl px-5 h-11 font-semibold flex items-center justify-center gap-2 shadow-sm"
+                >
+                  {restoring ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Upload className="h-4 w-4 text-zinc-400" />
+                  )}
+                  {restoring ? 'Restoring Database...' : 'Restore JSON Backup'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 6. Account Settings */}
         <div className="bg-white rounded-2xl border border-zinc-100 p-6 space-y-4 shadow-sm">
           <div className="flex items-center gap-2 border-b border-zinc-50 pb-4">
             <Shield className="h-5 w-5 text-primary" />
@@ -363,7 +564,7 @@ export function AdminSettings() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5 font-medium">
                 <User className="h-3.5 w-3.5" /> Logged In As
               </label>
               <p className="text-sm font-semibold text-zinc-900 bg-zinc-50 rounded-xl px-3.5 py-2.5 border border-zinc-100">
@@ -371,7 +572,7 @@ export function AdminSettings() {
               </p>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5 font-medium">
                 <Lock className="h-3.5 w-3.5" /> Access Role
               </label>
               <p className="text-sm font-semibold text-zinc-900 bg-zinc-50 rounded-xl px-3.5 py-2.5 border border-zinc-100">
@@ -381,7 +582,7 @@ export function AdminSettings() {
           </div>
         </div>
 
-        {/* 5. PWA Install */}
+        {/* 7. PWA Install */}
         <div className="bg-white rounded-2xl border border-zinc-100 p-6 shadow-sm">
           <div className="flex items-center gap-2 border-b border-zinc-50 pb-4 mb-4">
             <Smartphone className="h-5 w-5 text-secondary" />
@@ -438,7 +639,7 @@ export function AdminSettings() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-100">
-                      <p className="text-xs font-semibold text-zinc-900 flex items-center gap-1.5 mb-1">
+                      <p className="text-xs font-semibold text-zinc-900 flex items-center gap-1.5 mb-1 font-medium">
                         <Globe className="h-3.5 w-3.5 text-primary" /> Chrome / Edge (Desktop)
                       </p>
                       <p className="text-xs text-zinc-500">
@@ -446,7 +647,7 @@ export function AdminSettings() {
                       </p>
                     </div>
                     <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-100">
-                      <p className="text-xs font-semibold text-zinc-900 flex items-center gap-1.5 mb-1">
+                      <p className="text-xs font-semibold text-zinc-900 flex items-center gap-1.5 mb-1 font-medium">
                         <Smartphone className="h-3.5 w-3.5 text-secondary" /> iOS Safari
                       </p>
                       <p className="text-xs text-zinc-500">
@@ -460,7 +661,7 @@ export function AdminSettings() {
           )}
         </div>
 
-        {/* 6. App Info */}
+        {/* 8. App Diagnostics */}
         <div className="bg-white rounded-2xl border border-zinc-100 p-6 shadow-sm">
           <div className="flex items-center gap-2 border-b border-zinc-50 pb-4 mb-4">
             <Info className="h-5 w-5 text-zinc-400" />

@@ -334,7 +334,7 @@ export function AdminTestimonials() {
       {isFormOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex justify-end">
           <div 
-            className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col justify-between animate-slide-left p-6 md:p-8"
+            className="w-full sm:max-w-md bg-white h-full shadow-2xl flex flex-col justify-between animate-slide-left p-6"
           >
             {/* Header */}
             <div>

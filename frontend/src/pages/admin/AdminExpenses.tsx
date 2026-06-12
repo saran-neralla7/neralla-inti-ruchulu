@@ -132,7 +132,7 @@ export function AdminExpenses() {
           <p className="text-sm text-muted-foreground mt-0.5">Log and audit raw materials, packaging, and utility expenses</p>
         </div>
         {!showForm && (
-          <Button onClick={() => setShowForm(true)} className="bg-primary hover:bg-primary/90 text-white rounded-xl flex items-center gap-1.5 shadow-sm">
+          <Button onClick={() => setShowForm(true)} className="bg-primary hover:bg-primary/90 text-white rounded-xl flex items-center gap-1.5 shadow-sm animate-in fade-in duration-200">
             <Plus className="h-4 w-4" /> Log Expense
           </Button>
         )}
@@ -230,8 +230,8 @@ export function AdminExpenses() {
         </form>
       )}
 
-      {/* Expenses Table */}
-      <div className="bg-card border border-border/60 rounded-2xl shadow-sm overflow-hidden">
+      {/* Expenses List */}
+      <div className="bg-card border border-border/60 rounded-2xl shadow-sm overflow-hidden animate-in fade-in duration-200">
         <div className="px-5 py-4 border-b border-border/40">
           <h3 className="font-headline font-bold text-sm text-foreground">Expense History</h3>
         </div>
@@ -247,44 +247,77 @@ export function AdminExpenses() {
             <p className="text-xs text-zinc-400 max-w-[280px] text-center">Log raw materials and operational costs to audit net profit margins.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-muted/30 border-b border-border/40">
-                  <th className="px-5 py-3 text-xs font-bold text-zinc-500 uppercase tracking-wider">Date</th>
-                  <th className="px-5 py-3 text-xs font-bold text-zinc-500 uppercase tracking-wider">Category</th>
-                  <th className="px-5 py-3 text-xs font-bold text-zinc-500 uppercase tracking-wider">Description</th>
-                  <th className="px-5 py-3 text-xs font-bold text-zinc-500 text-right uppercase tracking-wider">Amount</th>
-                  <th className="px-5 py-3 text-xs font-bold text-zinc-500 text-right uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/20">
-                {expenses.map(exp => (
-                  <tr key={exp.id} className="hover:bg-muted/10 transition-colors">
-                    <td className="px-5 py-3.5 text-sm font-medium text-foreground">
-                      {new Date(exp.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </td>
-                    <td className="px-5 py-3.5 text-sm">
-                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${CATEGORY_COLORS[exp.category] || 'bg-zinc-50 text-zinc-600 border-zinc-200'}`}>
-                        {exp.category}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 text-sm text-muted-foreground">{exp.description}</td>
-                    <td className="px-5 py-3.5 text-sm font-bold text-foreground text-right">₹{exp.amount.toLocaleString('en-IN')}</td>
-                    <td className="px-5 py-3.5 text-right">
-                      <button
-                        onClick={() => handleDelete(exp)}
-                        className="p-1 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-colors"
-                        title="Delete expense"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </td>
+          <>
+            {/* Desktop Table View */}
+            <div className="overflow-x-auto hidden md:block">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-muted/30 border-b border-border/40">
+                    <th className="px-5 py-3 text-xs font-bold text-zinc-500 uppercase tracking-wider">Date</th>
+                    <th className="px-5 py-3 text-xs font-bold text-zinc-500 uppercase tracking-wider">Category</th>
+                    <th className="px-5 py-3 text-xs font-bold text-zinc-500 uppercase tracking-wider">Description</th>
+                    <th className="px-5 py-3 text-xs font-bold text-zinc-500 text-right uppercase tracking-wider">Amount</th>
+                    <th className="px-5 py-3 text-xs font-bold text-zinc-500 text-right uppercase tracking-wider">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-border/20">
+                  {expenses.map(exp => (
+                    <tr key={exp.id} className="hover:bg-muted/10 transition-colors">
+                      <td className="px-5 py-3.5 text-sm font-medium text-foreground">
+                        {new Date(exp.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </td>
+                      <td className="px-5 py-3.5 text-sm">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${CATEGORY_COLORS[exp.category] || 'bg-zinc-50 text-zinc-600 border-zinc-200'}`}>
+                          {exp.category}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-sm text-muted-foreground">{exp.description}</td>
+                      <td className="px-5 py-3.5 text-sm font-bold text-foreground text-right font-mono">₹{exp.amount.toLocaleString('en-IN')}</td>
+                      <td className="px-5 py-3.5 text-right">
+                        <button
+                          onClick={() => handleDelete(exp)}
+                          className="p-1 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-colors"
+                          title="Delete expense"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards View */}
+            <div className="block md:hidden divide-y divide-border/20">
+              {expenses.map(exp => (
+                <div key={exp.id} className="p-4 space-y-2.5 hover:bg-muted/10 transition-colors">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground font-medium">
+                        {new Date(exp.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                      <p className="font-bold text-foreground text-sm mt-0.5">{exp.description}</p>
+                    </div>
+                    <p className="font-bold text-foreground text-sm font-mono">₹{exp.amount.toLocaleString('en-IN')}</p>
+                  </div>
+                  
+                  <div className="flex justify-between items-center pt-1 border-t border-border/5">
+                    <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${CATEGORY_COLORS[exp.category] || 'bg-zinc-50 text-zinc-600 border-zinc-200'}`}>
+                      {exp.category}
+                    </span>
+                    <button
+                      onClick={() => handleDelete(exp)}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5"
+                      title="Delete expense"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   CheckCircle2, Clock,
   Trash2, Edit2, X, ChevronDown, MessageSquare,
@@ -184,6 +184,44 @@ function EditOrderDrawer({ order, onClose }: { order: Order; onClose: () => void
 // ─── Order Detail Popup ───────────────────────────────────────────────────────
 function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => void }) {
   const total = order.items.reduce((s, i) => s + i.price * i.quantity, 0);
+
+  // Query customer profile notes
+  const { data: customerProfile, refetch: refetchProfile } = useQuery({
+    queryKey: ['customer-profile', order.customerPhone],
+    queryFn: async () => {
+      const res = await api.get(`/admin/customers/profile/${order.customerPhone}`);
+      return res.data;
+    },
+    enabled: !!order.customerPhone,
+  });
+
+  // Query customer order history (excluding current order)
+  const { data: customerHistory = [] } = useQuery({
+    queryKey: ['customer-history', order.customerPhone],
+    queryFn: async () => {
+      const res = await api.get('/orders');
+      return (res.data || []).filter((o: any) => o.customerPhone === order.customerPhone && o.id !== order.id);
+    },
+    enabled: !!order.customerPhone,
+  });
+
+  const [notesText, setNotesText] = useState('');
+
+  useEffect(() => {
+    if (customerProfile?.kitchenNotes) {
+      setNotesText(customerProfile.kitchenNotes);
+    }
+  }, [customerProfile]);
+
+  const saveNotesMutation = useMutation({
+    mutationFn: async (notes: string) => {
+      await api.post(`/admin/customers/profile/${order.customerPhone}`, { kitchenNotes: notes });
+    },
+    onSuccess: () => {
+      refetchProfile();
+    }
+  });
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-background w-full max-w-md rounded-2xl shadow-2xl border border-border p-6 space-y-4 max-h-[90vh] overflow-y-auto">
@@ -242,6 +280,49 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
             <span className="text-primary">₹{total.toFixed(0)}</span>
           </div>
         </div>
+
+        {/* Customer Profile & Kitchen Notes Section */}
+        <div className="border-t border-border/40 pt-4 space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Customer Profile (History by Mobile)
+          </p>
+          <div className="bg-zinc-50 border border-border/50 rounded-xl p-3 space-y-2">
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Other Orders:</span>
+              <span className="font-bold text-primary">{customerHistory.length} past orders</span>
+            </div>
+            {customerHistory.length > 0 && (
+              <div className="max-h-20 overflow-y-auto text-[10px] space-y-1 text-muted-foreground border-b border-border/40 pb-2 mb-2">
+                {customerHistory.map((h: any, idx: number) => (
+                  <div key={h.id} className="flex justify-between">
+                    <span>{h.orderNumber || `Order #${idx+1}`} ({new Date(h.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })})</span>
+                    <span className="font-semibold">{h.status} - ₹{h.items.reduce((s: number, i: any) => s + i.price * i.quantity, 0)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {/* Kitchen Notes Input */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-semibold text-muted-foreground block">Kitchen & Prep Notes</label>
+              <textarea
+                rows={2}
+                value={notesText}
+                onChange={e => setNotesText(e.target.value)}
+                placeholder="e.g. Prefers low salt, likes extra spicy"
+                className="w-full text-xs p-2 border border-border rounded-lg bg-background resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <Button
+                onClick={() => saveNotesMutation.mutate(notesText)}
+                disabled={saveNotesMutation.isPending}
+                className="w-full h-7 text-[10px] rounded-lg bg-primary text-white hover:bg-primary/95"
+              >
+                {saveNotesMutation.isPending ? 'Saving...' : 'Save Kitchen Notes'}
+              </Button>
+            </div>
+          </div>
+        </div>
+
         <div className="flex gap-2">
           <Button 
             onClick={() => generateOrderPDF(order)} 
@@ -321,6 +402,27 @@ export function AdminOrders() {
         ? (order.actualAmountPaid !== null && order.actualAmountPaid !== undefined ? order.actualAmountPaid : total(order))
         : null,
     });
+  };
+
+  const handleWhatsAppNotify = (order: Order) => {
+    let messageText = '';
+    const collected = total(order) < 999 ? 80 : 0;
+    const orderTotal = order.actualAmountPaid !== null && order.actualAmountPaid !== undefined ? order.actualAmountPaid : total(order);
+    
+    if (order.status === 'Confirmed') {
+      messageText = `Hello *${order.customerName}*,\n\nWe have confirmed your order *${order.orderNumber}*! We are preparing it fresh in our kitchen. 👨‍🍳\n\n*Total Amount:* ₹${orderTotal.toFixed(0)}\n*Payment Status:* ${order.paymentStatus || 'Unpaid'}\n\nThank you for ordering with us!\n- Neralla Inti Ruchulu`;
+    } else if (order.status === 'Out For Delivery') {
+      messageText = `Hello *${order.customerName}*,\n\nYour order *${order.orderNumber}* is Out for Delivery! 🚚\n\n*Shipping Charge:* ₹${order.actualShippingCost ?? collected}\n*Fulfillment status:* Out for Delivery\n\nPlease keep your phone nearby for the courier partner. Thank you!\n- Neralla Inti Ruchulu`;
+    } else if (order.status === 'Delivered') {
+      messageText = `Hello *${order.customerName}*,\n\nYour order *${order.orderNumber}* has been successfully delivered! We hope you love the authentic taste of our homemade Andhra pickles. ❤️\n\nCould you please share your valuable review with us? It only takes a minute to share it on our storefront: https://neralla-inti-ruchulu.vercel.app/testimonials\n\nThank you for choosing us!\n- Neralla Inti Ruchulu`;
+    } else {
+      messageText = `Hello *${order.customerName}*,\n\nRegarding your order *${order.orderNumber}*, the current status is updated to *${order.status}*.\n\nThank you!\n- Neralla Inti Ruchulu`;
+    }
+
+    const cleanPhone = order.customerPhone.replace(/\D/g, '');
+    const formattedPhone = cleanPhone.startsWith('91') && cleanPhone.length === 12 ? cleanPhone : `91${cleanPhone}`;
+    const text = encodeURIComponent(messageText);
+    window.open(`https://api.whatsapp.com/send?phone=${formattedPhone}&text=${text}`, '_blank');
   };
 
   const handleStatusChange = (order: Order, nextStatus: string) => {
@@ -709,93 +811,169 @@ export function AdminOrders() {
             </div>
           )}
 
-          <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm animate-in fade-in duration-200">
             {filteredActive.length > 0 && (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border/50 bg-muted/30">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Order</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Customer</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Payment</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/30">
-                  {filteredActive.map(order => {
-                    return (
-                      <tr key={order.id} className="hover:bg-muted/20 transition-colors">
-                        <td className="px-4 py-3">
-                          <p className="font-semibold text-primary">{order.orderNumber}</p>
-                          <p className="text-xs text-muted-foreground">{new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>
-                        </td>
-                        <td className="px-4 py-3 hidden sm:table-cell">
-                          <p className="font-medium">{order.customerName}</p>
-                          <p className="text-xs text-muted-foreground">{order.customerPhone}</p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="relative inline-block">
-                            <select
-                              value={order.status}
-                              onChange={e => handleStatusChange(order, e.target.value)}
-                              className={cn(
-                                'text-xs font-semibold px-2 py-1 pr-6 rounded-full appearance-none cursor-pointer border-0 outline-none',
-                                STATUS_COLORS[order.status] || 'bg-muted text-muted-foreground'
+              <>
+                {/* Desktop Table View */}
+                <table className="w-full text-sm hidden md:table">
+                  <thead>
+                    <tr className="border-b border-border/50 bg-muted/30">
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Order</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Customer</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Payment</th>
+                      <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total</th>
+                      <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/30">
+                    {filteredActive.map(order => {
+                      return (
+                        <tr key={order.id} className="hover:bg-muted/20 transition-colors">
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-primary">{order.orderNumber}</p>
+                            <p className="text-xs text-muted-foreground">{new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>
+                          </td>
+                          <td className="px-4 py-3 hidden sm:table-cell">
+                            <p className="font-medium">{order.customerName}</p>
+                            <p className="text-xs text-muted-foreground">{order.customerPhone}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="relative inline-block">
+                              <select
+                                value={order.status}
+                                onChange={e => handleStatusChange(order, e.target.value)}
+                                className={cn(
+                                  'text-xs font-semibold px-2 py-1 pr-6 rounded-full appearance-none cursor-pointer border-0 outline-none',
+                                  STATUS_COLORS[order.status] || 'bg-muted text-muted-foreground'
+                                )}
+                              >
+                                {ACTIVE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                              </select>
+                              <ChevronDown className="absolute right-1 top-1/2 -translate-y-1/2 h-3 w-3 pointer-events-none opacity-60" />
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-col gap-1 items-start">
+                              <button
+                                onClick={() => togglePaymentStatus(order)}
+                                disabled={updateStatusMutation.isPending}
+                                className={cn(
+                                  'text-xs font-semibold px-2.5 py-1 rounded-full transition-all duration-150 active:scale-95 flex items-center gap-1',
+                                  order.paymentStatus === 'Paid'
+                                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                    : 'bg-red-100 text-red-700 hover:bg-red-200'
+                                )}
+                                title="Click to toggle payment status"
+                              >
+                                <span className={cn('h-1.5 w-1.5 rounded-full', order.paymentStatus === 'Paid' ? 'bg-green-500' : 'bg-red-500')} />
+                                {order.paymentStatus === 'Paid' ? 'Paid' : 'Unpaid'}
+                              </button>
+                              {order.paymentStatus === 'Paid' && (
+                                <span className="text-xs text-muted-foreground font-medium pl-1">
+                                  {order.actualAmountPaid !== null && order.actualAmountPaid !== undefined
+                                    ? `₹${order.actualAmountPaid}`
+                                    : `₹${total(order).toFixed(0)}`}
+                                </span>
                               )}
-                            >
-                              {ACTIVE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
-                            <ChevronDown className="absolute right-1 top-1/2 -translate-y-1/2 h-3 w-3 pointer-events-none opacity-60" />
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-col gap-1 items-start">
-                            <button
-                              onClick={() => togglePaymentStatus(order)}
-                              disabled={updateStatusMutation.isPending}
-                              className={cn(
-                                'text-xs font-semibold px-2.5 py-1 rounded-full transition-all duration-150 active:scale-95 flex items-center gap-1',
-                                order.paymentStatus === 'Paid'
-                                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                  : 'bg-red-100 text-red-700 hover:bg-red-200'
-                              )}
-                              title="Click to toggle payment status"
-                            >
-                              <span className={cn('h-1.5 w-1.5 rounded-full', order.paymentStatus === 'Paid' ? 'bg-green-500' : 'bg-red-500')} />
-                              {order.paymentStatus === 'Paid' ? 'Paid' : 'Unpaid'}
-                            </button>
-                            {order.paymentStatus === 'Paid' && (
-                              <span className="text-xs text-muted-foreground font-medium pl-1">
-                                {order.actualAmountPaid !== null && order.actualAmountPaid !== undefined
-                                  ? `₹${order.actualAmountPaid}`
-                                  : `₹${total(order).toFixed(0)}`}
-                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold text-primary">₹{total(order).toFixed(0)}</td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button onClick={() => generateOrderPDF(order)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors" title="Download Invoice PDF">
+                                <FileText className="h-4 w-4" />
+                              </button>
+                              <button onClick={() => setViewingOrder(order)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors" title="View Order">
+                                <Eye className="h-4 w-4" />
+                              </button>
+                              <button onClick={() => setEditingOrder(order)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors" title="Edit Order">
+                                <Edit2 className="h-4 w-4" />
+                              </button>
+                              <button onClick={() => handleDelete(order)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-colors" title="Delete Order">
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                              <button onClick={() => handleWhatsAppNotify(order)} className="p-1.5 rounded-lg text-muted-foreground hover:text-green-600 hover:bg-green-50 transition-colors" title="Send WhatsApp Update">
+                                <MessageSquare className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+
+                {/* Mobile Cards View */}
+                <div className="block md:hidden divide-y divide-border/30">
+                  {filteredActive.map(order => (
+                    <div key={order.id} className="p-4 space-y-3 hover:bg-muted/10 transition-colors">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-bold text-primary text-sm">{order.orderNumber}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                        <p className="font-bold text-primary text-sm">₹{total(order).toFixed(0)}</p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-semibold text-foreground">{order.customerName}</p>
+                        <p className="text-xs text-muted-foreground">{order.customerPhone}</p>
+                      </div>
+
+                      <div className="flex justify-between items-center gap-2 pt-1">
+                        <div className="relative inline-block">
+                          <select
+                            value={order.status}
+                            onChange={e => handleStatusChange(order, e.target.value)}
+                            className={cn(
+                              'text-[11px] font-semibold px-2 py-1 pr-6 rounded-full appearance-none cursor-pointer border-0 outline-none',
+                              STATUS_COLORS[order.status] || 'bg-muted text-muted-foreground'
                             )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-right font-semibold text-primary">₹{total(order).toFixed(0)}</td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <button onClick={() => generateOrderPDF(order)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors" title="Download Invoice PDF">
-                              <FileText className="h-4 w-4" />
-                            </button>
-                            <button onClick={() => setViewingOrder(order)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors" title="View Order">
-                              <Eye className="h-4 w-4" />
-                            </button>
-                            <button onClick={() => setEditingOrder(order)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors" title="Edit Order">
-                              <Edit2 className="h-4 w-4" />
-                            </button>
-                            <button onClick={() => handleDelete(order)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-colors" title="Delete Order">
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          >
+                            {ACTIVE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                          <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 pointer-events-none opacity-60" />
+                        </div>
+
+                        <button
+                          onClick={() => togglePaymentStatus(order)}
+                          disabled={updateStatusMutation.isPending}
+                          className={cn(
+                            'text-[11px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 transition-all active:scale-95',
+                            order.paymentStatus === 'Paid'
+                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                              : 'bg-red-100 text-red-700 hover:bg-red-200'
+                          )}
+                        >
+                          <span className={cn('h-1.5 w-1.5 rounded-full', order.paymentStatus === 'Paid' ? 'bg-green-500' : 'bg-red-500')} />
+                          {order.paymentStatus === 'Paid' ? `Paid (₹${order.actualAmountPaid ?? total(order).toFixed(0)})` : 'Unpaid'}
+                        </button>
+                      </div>
+
+                      <div className="flex justify-end gap-1.5 pt-2 border-t border-border/10">
+                        <button onClick={() => generateOrderPDF(order)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-muted/50" title="Invoice PDF">
+                          <FileText className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => setViewingOrder(order)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-muted/50" title="View">
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => setEditingOrder(order)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-muted/50" title="Edit">
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => handleDelete(order)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-muted/50" title="Delete">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => handleWhatsAppNotify(order)} className="p-1.5 rounded-lg text-muted-foreground hover:text-green-600 hover:bg-green-50" title="Send WhatsApp Update">
+                          <MessageSquare className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </div>
