@@ -17,7 +17,7 @@ export default defineConfig({
       manifest: {
         name: 'Neralla Inti Ruchulu',
         short_name: 'NIR Pickles',
-        description: 'Premium Andhra Home Foods — authentic pickles and powders from Tenali',
+        description: 'Premium Andhra Home Foods — authentic pickles and powders from Visakhapatnam',
         theme_color: '#3c1611',
         background_color: '#fdfbf7',
         display: 'standalone',

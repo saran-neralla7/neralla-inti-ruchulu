@@ -9,7 +9,7 @@ export function Footer() {
             &copy; {new Date().getFullYear()} Neralla Inti Ruchulu. All rights reserved.
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Premium Andhra Home Foods from Tenali.
+            Premium Andhra Home Foods from Visakhapatnam.
           </p>
         </div>
         

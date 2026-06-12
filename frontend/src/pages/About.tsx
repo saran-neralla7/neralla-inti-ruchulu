@@ -154,8 +154,7 @@ export function About() {
                 <div>
                   <p className="font-semibold text-base text-foreground">Main Kitchen &amp; Store</p>
                   <p className="text-muted-foreground text-sm mt-1">
-                    Plot No. 42, MVP Colony, Sector-1<br />
-                    Visakhapatnam, Andhra Pradesh 530017
+                    Sector-2, MVP Colony, Visakhapatnam - 530017
                   </p>
                 </div>
               </div>
@@ -176,14 +175,19 @@ export function About() {
                 </div>
                 <div>
                   <p className="font-semibold text-base text-foreground">Email</p>
-                  <p className="text-muted-foreground text-sm mt-1">namaste@nerallaintiruchulu.com</p>
+                  <p className="text-muted-foreground text-sm mt-1">neralla.intiruchulu@gmail.com</p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Map Image */}
-          <div className="relative aspect-[4/3] w-full rounded-2xl overflow-hidden shadow-xl border border-border/50 order-1 md:order-2 bg-muted flex items-center justify-center group">
+          {/* Map Image Link */}
+          <a
+            href="https://maps.app.goo.gl/6fLrpno4gEKqSaaP8"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="relative aspect-[4/3] w-full rounded-2xl overflow-hidden shadow-xl border border-border/50 order-1 md:order-2 bg-muted flex items-center justify-center group block cursor-pointer"
+          >
             <img
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuAoj6ujwSCt1ZXvMmDKCZXMCWT_FVTEc2mPFq-BqcW9Z_On_gbXyoe1I4dDHFiN-sKY_7odDkXEGBzFFKk5muJUiCILkkyRHWNnWcwf4FzRris0Ej26qlqbGx0kROywOXB1-XmGaueRU-BL8vKM4JyCYmnxdPsOiOK0bITcMxnvLt-Z9VqrpYitC7gHw2g_6ciy6l4J3LE9tNDxQYlJSzeEIUTNtwT3cBNCWrzPKfWckjQxA8miEn0Cp0KvviBTU6gFdyKkUO0murJ6"
               alt="Map Visakhapatnam"
@@ -194,7 +198,7 @@ export function About() {
               <MapPin className="h-6 w-6 text-primary fill-primary/20 animate-bounce" />
               <span className="font-semibold text-xs text-primary uppercase tracking-wider">MVP Colony</span>
             </div>
-          </div>
+          </a>
         </div>
       </section>
     </div>
