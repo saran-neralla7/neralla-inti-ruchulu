@@ -12,7 +12,7 @@ export function About() {
       <section className="relative min-h-[50vh] md:min-h-[60vh] flex items-center justify-center py-16 overflow-hidden bg-gradient-to-br from-primary/10 via-background to-secondary/5">
         <div className="absolute inset-0 z-0">
           <img
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUw7BlL8oqcDBDPhpJS44WrrL4P9jwA3V1MPWJYD77kQ62LJM1Wtv1dnHYMc0-Z1I-Hm-S6QqrXvsKDN-sFU0_-OrwbY1V-L87Vip_HtUPsu1S9DFZeD0lJIqDhO496six_Gm0FtJTRdpP0dEWA3QN71fHaxjwhOrMf-xqa9eLSrEdVEaDOr879ieQvkXhi_6zlwgZT2Z5uZR4h6ih9inLVg728IfrgZEEbo0KvkbyLm5yKZCMnhyHWTZcEVZZVkgtpBRvDFuJat7U"
+            src="/legacy-kitchen.jpg"
             alt="Spices background"
             className="w-full h-full object-cover opacity-10 filter sepia-[0.2] contrast-[1.1] brightness-[0.95]"
           />

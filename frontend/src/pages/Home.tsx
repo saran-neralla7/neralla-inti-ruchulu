@@ -115,7 +115,7 @@ export function Home() {
         {/* Background Image from Stitch */}
         <div className="absolute inset-0 z-0">
           <img
-            src="https://lh3.googleusercontent.com/aida/AP1WRLt4J1vR2-7cKxynLdCRlBayFAt0ltLJLdPmRjlouqvEKFxiwYgV-9bI-06LuQa7nr8ihrgoC9xVJmGTHFEKn611PtAIxsbPd6hsvoGj8nYIa5j7MvNsbvthiGSaVLeUCAaG1Nb2_dhi9jirMK-xqxIhPq81uBM1S85TkWGZeokkAZspw5Ye5ro5rn0viMaUFtbCZQyAnDHx3AZnx2JGm3m0T-we2Ky36nDUWUZFoOWN0ESVzvdUu6Wy3RA5"
+            src="/hero-bg.jpg"
             alt="Neralla Inti Ruchulu Heritage Background"
             className="w-full h-full object-cover object-center transform scale-105"
           />
