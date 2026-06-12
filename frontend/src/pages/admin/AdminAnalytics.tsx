@@ -66,6 +66,7 @@ interface PLSummary {
   totalExpenses: number;
   netProfit: number;
   netProfitMargin: number;
+  totalPendingAmount?: number;
 }
 
 interface PLReport {
@@ -301,7 +302,7 @@ export function AdminAnalytics() {
     
     const totalOutflow = summary.totalCogs + summary.totalActualShippingCost + summary.gatewayFees + summary.totalExpenses;
     
-    const text = `📊 *NERALLA INTI RUCHULU - P&L STATEMENT* 📊\n📅 *Period:* ${startStr} to ${endStr}\n\n🟢 *INFLOW (Revenue):*\n- Product Sales: ₹${summary.grossRevenue.toLocaleString('en-IN')}\n- Shipping Fees: ₹${summary.shippingCollected.toLocaleString('en-IN')}\n*Total Inflow (A):* ₹${summary.totalInflow.toLocaleString('en-IN')}\n\n🔴 *OUTFLOW (Costs):*\n- COGS (Ingredients): ₹${summary.totalCogs.toLocaleString('en-IN')}\n- Courier Shipping: ₹${summary.totalActualShippingCost.toLocaleString('en-IN')}\n- Payment Gateway Fees: ₹${summary.gatewayFees.toLocaleString('en-IN')}\n- Bulk Expenses: ₹${summary.totalExpenses.toLocaleString('en-IN')}\n*Total Outflow (B):* ₹${totalOutflow.toLocaleString('en-IN')}\n\n💰 *NET PROFIT (A - B):* ₹${summary.netProfit.toLocaleString('en-IN')}\n📈 *NET MARGIN:* ${summary.netProfitMargin.toFixed(1)}%\n\nShared from Admin Panel.`;
+    const text = `📊 *NERALLA INTI RUCHULU - P&L STATEMENT* 📊\n📅 *Period:* ${startStr} to ${endStr}\n\n🟢 *INFLOW (Revenue):*\n- Product Sales: ₹${summary.grossRevenue.toLocaleString('en-IN')}\n- Shipping Fees: ₹${summary.shippingCollected.toLocaleString('en-IN')}\n*Total Inflow (A):* ₹${summary.totalInflow.toLocaleString('en-IN')}\n\n⏳ *OUTSTANDING / UNPAID:* ₹${(summary.totalPendingAmount ?? 0).toLocaleString('en-IN')}\n\n🔴 *OUTFLOW (Costs):*\n- COGS (Ingredients): ₹${summary.totalCogs.toLocaleString('en-IN')}\n- Courier Shipping: ₹${summary.totalActualShippingCost.toLocaleString('en-IN')}\n- Payment Gateway Fees: ₹${summary.gatewayFees.toLocaleString('en-IN')}\n- Bulk Expenses: ₹${summary.totalExpenses.toLocaleString('en-IN')}\n*Total Outflow (B):* ₹${totalOutflow.toLocaleString('en-IN')}\n\n💰 *NET PROFIT (A - B):* ₹${summary.netProfit.toLocaleString('en-IN')}\n📈 *NET MARGIN:* ${summary.netProfitMargin.toFixed(1)}%\n\nShared from Admin Panel.`;
     
     navigator.clipboard.writeText(text).then(() => {
       setCopiedPL(true);
@@ -550,7 +551,13 @@ export function AdminAnalytics() {
                 <ArrowUpRight className="h-4 w-4 text-emerald-600" />
               </div>
               <p className="text-2xl font-bold text-foreground">₹{plReport.summary.totalInflow.toLocaleString('en-IN')}</p>
-              <p className="text-[11px] text-muted-foreground">Gross Sales (₹{plReport.summary.grossRevenue}) + Shipping (₹{plReport.summary.shippingCollected})</p>
+              <div className="flex flex-col gap-1 text-[11px] text-muted-foreground pt-1 border-t border-border/40">
+                <p>Gross Sales (₹{plReport.summary.grossRevenue.toLocaleString('en-IN')}) + Shipping (₹{plReport.summary.shippingCollected.toLocaleString('en-IN')})</p>
+                <p className="text-amber-600 font-semibold flex items-center justify-between">
+                  <span>Outstanding (Unpaid/Partial):</span>
+                  <span>₹{(plReport.summary.totalPendingAmount ?? 0).toLocaleString('en-IN')}</span>
+                </p>
+              </div>
             </div>
 
             <div className="bg-card border border-border/60 rounded-2xl p-5 shadow-sm space-y-2">
@@ -617,6 +624,10 @@ export function AdminAnalytics() {
                   <div className="flex justify-between items-center text-emerald-800 py-1.5 font-bold border-t border-dashed border-emerald-200 bg-emerald-50/20 px-2 rounded">
                     <span>Total Inflow (A)</span>
                     <span>₹{plReport.summary.totalInflow.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-amber-800 py-1.5 font-semibold border-t border-dashed border-amber-200 bg-amber-50/25 px-2 rounded mt-2">
+                    <span>Outstanding / Unpaid Balances (Pending)</span>
+                    <span>₹{(plReport.summary.totalPendingAmount ?? 0).toLocaleString('en-IN')}</span>
                   </div>
                 </div>
 
