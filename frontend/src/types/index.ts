@@ -52,7 +52,9 @@ export interface Order {
   approvedAt?: string | null;
   actualShippingCost?: number;
   actualAmountPaid?: number | null;
-  paymentStatus?: 'Unpaid' | 'Paid';
+  paymentStatus?: 'Unpaid' | 'Partially Paid' | 'Paid';
+  advancePaid?: number;
+  balancePaid?: number;
 }
 
 export interface OrderItem {

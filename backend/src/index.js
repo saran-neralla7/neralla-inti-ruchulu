@@ -355,6 +355,22 @@ app.post('/api/admin/orders', authenticateAdmin, async (req, res) => {
         const data = req.body;
         // Auto-generate order number
         const orderNumber = await generateOrderNumber();
+        const shipping = Number(data.actualShippingCost) || 0;
+        const itemsList = data.items || [];
+        const itemsTotal = itemsList.reduce((s, item) => s + (Number(item.price) * Number(item.quantity)), 0);
+        const orderTotal = itemsTotal + shipping;
+        const advancePaid = Number(data.advancePaid) || 0;
+        const balancePaid = Number(data.balancePaid) || 0;
+        const totalPaid = advancePaid + balancePaid;
+        let paymentStatus = data.paymentStatus;
+        if (!paymentStatus) {
+            if (totalPaid === 0)
+                paymentStatus = 'Unpaid';
+            else if (totalPaid >= orderTotal)
+                paymentStatus = 'Paid';
+            else
+                paymentStatus = 'Partially Paid';
+        }
         const order = await prisma.order.create({
             data: {
                 orderNumber,
@@ -365,11 +381,15 @@ app.post('/api/admin/orders', authenticateAdmin, async (req, res) => {
                 status: data.status || 'Confirmed',
                 adminNotes: data.adminNotes || null,
                 approvedAt: new Date(),
-                actualShippingCost: Number(data.actualShippingCost) || 0,
-                actualAmountPaid: data.actualAmountPaid !== undefined && data.actualAmountPaid !== null ? Number(data.actualAmountPaid) : null,
-                paymentStatus: data.paymentStatus || 'Unpaid',
+                actualShippingCost: shipping,
+                actualAmountPaid: totalPaid,
+                paymentStatus,
+                advancePaid,
+                advancePaidAt: advancePaid > 0 ? new Date() : null,
+                balancePaid,
+                balancePaidAt: balancePaid > 0 ? new Date() : null,
                 items: {
-                    create: (data.items || []).map((item) => ({
+                    create: itemsList.map((item) => ({
                         productName_en: item.productName_en || item.name_en || '',
                         productName_te: item.productName_te || item.name_te || '',
                         variantSize: item.variantSize || item.size || '',
@@ -423,8 +443,16 @@ app.put('/api/orders/:id/approve', authenticateAdmin, async (req, res) => {
 // Update Order Status (Admin Only) — for approved orders
 app.put('/api/orders/:id/status', authenticateAdmin, async (req, res) => {
     const id = req.params.id;
-    const { status, actualShippingCost, actualAmountPaid, paymentStatus } = req.body;
+    const { status, actualShippingCost, actualAmountPaid, paymentStatus, advancePaid, balancePaid } = req.body;
     try {
+        const existing = await prisma.order.findUnique({
+            where: { id },
+            include: { items: true }
+        });
+        if (!existing) {
+            res.status(404).json({ error: 'Order not found' });
+            return;
+        }
         const updateData = {};
         if (status !== undefined) {
             updateData.status = status;
@@ -432,11 +460,53 @@ app.put('/api/orders/:id/status', authenticateAdmin, async (req, res) => {
         if (actualShippingCost !== undefined) {
             updateData.actualShippingCost = Number(actualShippingCost) || 0;
         }
-        if (actualAmountPaid !== undefined) {
-            updateData.actualAmountPaid = actualAmountPaid !== null ? Number(actualAmountPaid) : null;
+        const shipping = actualShippingCost !== undefined ? Number(actualShippingCost) : existing.actualShippingCost;
+        const itemsTotal = existing.items.reduce((s, i) => s + i.price * i.quantity, 0);
+        const orderTotal = itemsTotal + shipping;
+        let nextAdvancePaid = existing.advancePaid;
+        if (advancePaid !== undefined) {
+            nextAdvancePaid = Number(advancePaid) || 0;
+            updateData.advancePaid = nextAdvancePaid;
+            if (nextAdvancePaid > 0 && existing.advancePaid === 0) {
+                updateData.advancePaidAt = new Date();
+            }
+            else if (nextAdvancePaid === 0) {
+                updateData.advancePaidAt = null;
+            }
         }
+        let nextBalancePaid = existing.balancePaid;
+        if (balancePaid !== undefined) {
+            nextBalancePaid = Number(balancePaid) || 0;
+            updateData.balancePaid = nextBalancePaid;
+            if (nextBalancePaid > 0 && existing.balancePaid === 0) {
+                updateData.balancePaidAt = new Date();
+            }
+            else if (nextBalancePaid === 0) {
+                updateData.balancePaidAt = null;
+            }
+        }
+        const totalPaid = nextAdvancePaid + nextBalancePaid;
+        updateData.actualAmountPaid = totalPaid;
         if (paymentStatus !== undefined) {
             updateData.paymentStatus = paymentStatus;
+        }
+        else if (advancePaid !== undefined || balancePaid !== undefined || actualShippingCost !== undefined) {
+            if (totalPaid === 0)
+                updateData.paymentStatus = 'Unpaid';
+            else if (totalPaid >= orderTotal)
+                updateData.paymentStatus = 'Paid';
+            else
+                updateData.paymentStatus = 'Partially Paid';
+        }
+        else if (actualAmountPaid !== undefined) {
+            const amt = Number(actualAmountPaid) || 0;
+            updateData.actualAmountPaid = amt;
+            if (amt === 0)
+                updateData.paymentStatus = 'Unpaid';
+            else if (amt >= orderTotal)
+                updateData.paymentStatus = 'Paid';
+            else
+                updateData.paymentStatus = 'Partially Paid';
         }
         const order = await prisma.order.update({
             where: { id },
@@ -452,34 +522,69 @@ app.put('/api/orders/:id/status', authenticateAdmin, async (req, res) => {
 // Edit pending/approved order details and items (Admin Only)
 app.put('/api/orders/:id', authenticateAdmin, async (req, res) => {
     const id = req.params.id;
-    const { customerName, customerPhone, customerAddress, adminNotes, items, actualShippingCost, actualAmountPaid, paymentStatus } = req.body;
+    const { customerName, customerPhone, customerAddress, adminNotes, items, actualShippingCost, paymentStatus, advancePaid, balancePaid } = req.body;
     try {
+        const existing = await prisma.order.findUnique({
+            where: { id }
+        });
+        if (!existing) {
+            res.status(404).json({ error: 'Order not found' });
+            return;
+        }
         // Delete existing items and recreate
         await prisma.orderItem.deleteMany({ where: { orderId: id } });
+        const newItems = items || [];
+        const itemsTotal = newItems.reduce((s, i) => s + (Number(i.price) * Number(i.quantity)), 0);
+        const shipping = actualShippingCost !== undefined ? Number(actualShippingCost) : existing.actualShippingCost;
+        const orderTotal = itemsTotal + shipping;
+        const nextAdvancePaid = advancePaid !== undefined ? (Number(advancePaid) || 0) : existing.advancePaid;
+        const nextBalancePaid = balancePaid !== undefined ? (Number(balancePaid) || 0) : existing.balancePaid;
+        const totalPaid = nextAdvancePaid + nextBalancePaid;
+        let calculatedPaymentStatus = paymentStatus;
+        if (!calculatedPaymentStatus) {
+            if (totalPaid === 0)
+                calculatedPaymentStatus = 'Unpaid';
+            else if (totalPaid >= orderTotal)
+                calculatedPaymentStatus = 'Paid';
+            else
+                calculatedPaymentStatus = 'Partially Paid';
+        }
         const updateData = {
             customerName,
             customerPhone,
             customerAddress,
             adminNotes,
+            actualShippingCost: shipping,
+            actualAmountPaid: totalPaid,
+            paymentStatus: calculatedPaymentStatus,
+            advancePaid: nextAdvancePaid,
+            balancePaid: nextBalancePaid,
             items: {
-                create: (items || []).map((item) => ({
-                    productName_en: item.productName_en,
-                    productName_te: item.productName_te,
-                    variantSize: item.variantSize,
-                    variantPackaging: item.variantPackaging,
-                    quantity: Number(item.quantity),
-                    price: Number(item.price),
+                create: newItems.map((item) => ({
+                    productName_en: item.productName_en || item.name_en || '',
+                    productName_te: item.productName_te || item.name_te || '',
+                    variantSize: item.variantSize || item.size || '',
+                    variantPackaging: item.variantPackaging || item.packaging || '',
+                    quantity: Number(item.quantity) || 1,
+                    price: Number(item.price) || 0,
                 }))
             }
         };
-        if (actualShippingCost !== undefined) {
-            updateData.actualShippingCost = Number(actualShippingCost) || 0;
+        if (advancePaid !== undefined) {
+            if (nextAdvancePaid > 0 && existing.advancePaid === 0) {
+                updateData.advancePaidAt = new Date();
+            }
+            else if (nextAdvancePaid === 0) {
+                updateData.advancePaidAt = null;
+            }
         }
-        if (actualAmountPaid !== undefined) {
-            updateData.actualAmountPaid = actualAmountPaid !== null ? Number(actualAmountPaid) : null;
-        }
-        if (paymentStatus !== undefined) {
-            updateData.paymentStatus = paymentStatus;
+        if (balancePaid !== undefined) {
+            if (nextBalancePaid > 0 && existing.balancePaid === 0) {
+                updateData.balancePaidAt = new Date();
+            }
+            else if (nextBalancePaid === 0) {
+                updateData.balancePaidAt = null;
+            }
         }
         const order = await prisma.order.update({
             where: { id },
@@ -563,24 +668,37 @@ app.get('/api/analytics/overview', authenticateAdmin, async (req, res) => {
             prisma.order.findMany({ where: { orderNumber: { not: null } }, include: { items: true } }),
             prisma.order.count({ where: { status: 'Pending Approval' } }),
         ]);
-        const paidOrders = approvedOrders.filter(o => o.paymentStatus === 'Paid');
-        const totalRevenue = paidOrders.reduce((s, o) => {
-            const orderRevenue = o.actualAmountPaid !== null && o.actualAmountPaid !== undefined ? o.actualAmountPaid : o.items.reduce((ss, i) => ss + i.price * i.quantity, 0);
-            return s + orderRevenue;
+        // Total revenue is the sum of actualAmountPaid across all approved orders
+        const totalRevenue = approvedOrders.reduce((s, o) => s + (o.actualAmountPaid || 0), 0);
+        // Calculate outstanding pending payments (excluding Cancelled/Pending Approval orders)
+        const totalPendingAmount = approvedOrders.reduce((s, o) => {
+            if (o.status === 'Cancelled')
+                return s;
+            const orderTotal = o.items.reduce((sum, item) => sum + item.price * item.quantity, 0) + (o.actualShippingCost || 0);
+            const paid = o.actualAmountPaid || 0;
+            const pending = Math.max(0, orderTotal - paid);
+            return s + pending;
         }, 0);
+        const paidOrders = approvedOrders.filter(o => o.paymentStatus === 'Paid' || o.paymentStatus === 'Partially Paid');
         const avgOrderValue = paidOrders.length > 0 ? totalRevenue / paidOrders.length : 0;
         const now = new Date();
-        const mtdOrders = paidOrders.filter(o => {
+        const mtdOrders = approvedOrders.filter(o => {
             const d = new Date(o.createdAt);
             return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
         });
-        const mtdRevenue = mtdOrders.reduce((s, o) => {
-            const orderRevenue = o.actualAmountPaid !== null && o.actualAmountPaid !== undefined ? o.actualAmountPaid : o.items.reduce((ss, i) => ss + i.price * i.quantity, 0);
-            return s + orderRevenue;
-        }, 0);
+        const mtdRevenue = mtdOrders.reduce((s, o) => s + (o.actualAmountPaid || 0), 0);
         const statusCounts = {};
         (await prisma.order.groupBy({ by: ['status'], _count: { id: true } })).forEach(g => { statusCounts[g.status] = g._count.id; });
-        res.json({ totalOrders, totalRevenue, avgOrderValue, pendingOrders, mtdRevenue, mtdOrders: mtdOrders.length, statusCounts });
+        res.json({
+            totalOrders,
+            totalRevenue,
+            avgOrderValue,
+            pendingOrders,
+            mtdRevenue,
+            mtdOrders: mtdOrders.length,
+            statusCounts,
+            totalPendingAmount
+        });
     }
     catch (error) {
         res.status(500).json({ error: 'Failed to fetch analytics overview' });
@@ -589,7 +707,10 @@ app.get('/api/analytics/overview', authenticateAdmin, async (req, res) => {
 app.get('/api/analytics/revenue-by-month', authenticateAdmin, async (req, res) => {
     try {
         const orders = await prisma.order.findMany({
-            where: { orderNumber: { not: null }, paymentStatus: 'Paid' },
+            where: {
+                orderNumber: { not: null },
+                paymentStatus: { in: ['Paid', 'Partially Paid'] }
+            },
             include: { items: true },
             orderBy: { createdAt: 'asc' },
         });
@@ -600,7 +721,7 @@ app.get('/api/analytics/revenue-by-month', authenticateAdmin, async (req, res) =
             const label = d.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
             if (!monthMap[key])
                 monthMap[key] = { month: label, revenue: 0, orders: 0 };
-            const orderRevenue = order.actualAmountPaid !== null && order.actualAmountPaid !== undefined ? order.actualAmountPaid : order.items.reduce((s, i) => s + i.price * i.quantity, 0);
+            const orderRevenue = order.actualAmountPaid || 0;
             monthMap[key].revenue += orderRevenue;
             monthMap[key].orders += 1;
         });
@@ -643,7 +764,7 @@ app.get('/api/customers', authenticateAdmin, async (req, res) => {
                 customerMap[key] = { name: order.customerName, phone: order.customerPhone, totalOrders: 0, totalSpent: 0, lastOrderDate: order.createdAt, address: order.customerAddress };
             }
             customerMap[key].totalOrders += 1;
-            if (order.orderNumber && order.paymentStatus === 'Paid')
+            if (order.orderNumber && (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Paid'))
                 customerMap[key].totalSpent += orderTotal;
             if (new Date(order.createdAt) > new Date(customerMap[key].lastOrderDate))
                 customerMap[key].lastOrderDate = order.createdAt;
@@ -815,7 +936,7 @@ app.get('/api/admin/reports/profit-loss', authenticateAdmin, async (req, res) =>
             where: {
                 orderNumber: { not: null },
                 status: { notIn: ['Pending Approval', 'Cancelled'] },
-                paymentStatus: 'Paid',
+                paymentStatus: { in: ['Paid', 'Partially Paid', 'Unpaid'] },
                 ...dateFilter,
             },
             include: {
@@ -836,6 +957,7 @@ app.get('/api/admin/reports/profit-loss', authenticateAdmin, async (req, res) =>
         let totalCogs = 0;
         let shippingCollected = 0;
         let totalActualShippingCost = 0;
+        let totalPendingAmount = 0;
         orders.forEach(order => {
             let orderProductTotal = 0;
             order.items.forEach(item => {
@@ -849,6 +971,10 @@ app.get('/api/admin/reports/profit-loss', authenticateAdmin, async (req, res) =>
             grossRevenue += orderRevenue;
             totalActualShippingCost += order.actualShippingCost ?? 0;
             // Shipping collected is 0 since we don't charge shipping on the PWA storefront checkout
+            const orderTotal = orderProductTotal + (order.actualShippingCost ?? 0);
+            const paid = order.actualAmountPaid !== null && order.actualAmountPaid !== undefined ? order.actualAmountPaid : orderTotal;
+            const pending = Math.max(0, orderTotal - paid);
+            totalPendingAmount += pending;
         });
         const totalInflow = grossRevenue + shippingCollected;
         const gatewayFees = 0; // Removed gateway charges for now as requested by user
@@ -876,6 +1002,7 @@ app.get('/api/admin/reports/profit-loss', authenticateAdmin, async (req, res) =>
                 totalExpenses,
                 netProfit,
                 netProfitMargin: totalInflow > 0 ? (netProfit / totalInflow) * 100 : 0,
+                totalPendingAmount,
             },
             expenses,
             ordersCount: orders.length,

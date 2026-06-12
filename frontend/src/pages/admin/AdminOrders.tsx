@@ -35,11 +35,8 @@ function EditOrderDrawer({ order, onClose }: { order: Order; onClose: () => void
 
   // Finance fields for approved/delivered orders
   const [actualShippingCost, setActualShippingCost] = useState((order.actualShippingCost ?? 0).toString());
-  const [actualAmountPaid, setActualAmountPaid] = useState(
-    order.actualAmountPaid !== null && order.actualAmountPaid !== undefined
-      ? order.actualAmountPaid.toString()
-      : ''
-  );
+  const [advancePaid, setAdvancePaid] = useState((order.advancePaid ?? 0).toString());
+  const [balancePaid, setBalancePaid] = useState((order.balancePaid ?? 0).toString());
   const [paymentStatus, setPaymentStatus] = useState<string>(order.paymentStatus || 'Unpaid');
 
   // Add item inputs
@@ -56,6 +53,23 @@ function EditOrderDrawer({ order, onClose }: { order: Order; onClose: () => void
     },
   });
 
+  // Calculate items total
+  const itemsTotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const expectedTotal = itemsTotal + (Number(actualShippingCost) || 0);
+  const totalPaid = (Number(advancePaid) || 0) + (Number(balancePaid) || 0);
+  const pendingBalance = expectedTotal - totalPaid;
+
+  // Automatically adjust paymentStatus based on totalPaid vs expectedTotal
+  useEffect(() => {
+    if (totalPaid === 0) {
+      setPaymentStatus('Unpaid');
+    } else if (totalPaid >= expectedTotal) {
+      setPaymentStatus('Paid');
+    } else {
+      setPaymentStatus('Partially Paid');
+    }
+  }, [totalPaid, expectedTotal]);
+
   const editMutation = useMutation({
     mutationFn: async () => {
       const res = await api.put(`/orders/${order.id}`, {
@@ -65,7 +79,8 @@ function EditOrderDrawer({ order, onClose }: { order: Order; onClose: () => void
         adminNotes,
         items,
         actualShippingCost: Number(actualShippingCost) || 0,
-        actualAmountPaid: actualAmountPaid !== '' ? Number(actualAmountPaid) : null,
+        advancePaid: Number(advancePaid) || 0,
+        balancePaid: Number(balancePaid) || 0,
         paymentStatus,
       });
       return res.data;
@@ -75,9 +90,6 @@ function EditOrderDrawer({ order, onClose }: { order: Order; onClose: () => void
       onClose();
     },
   });
-
-  // Calculate items total
-  const itemsTotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40">
@@ -288,29 +300,52 @@ function EditOrderDrawer({ order, onClose }: { order: Order; onClose: () => void
                 </div>
               </div>
               <div>
-                <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Actual Amount Paid</label>
+                <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Payment Status</label>
+                <select
+                  value={paymentStatus}
+                  onChange={e => setPaymentStatus(e.target.value)}
+                  className="w-full border border-border rounded-lg px-2 py-1.5 text-xs bg-background font-semibold"
+                >
+                  <option value="Unpaid">Unpaid (చెల్లించలేదు)</option>
+                  <option value="Partially Paid">Partially Paid (పాక్షికంగా)</option>
+                  <option value="Paid">Paid (చెల్లించారు)</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Advance Paid</label>
                 <div className="relative">
                   <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-primary text-xs font-bold">₹</span>
                   <input
                     type="number"
-                    value={actualAmountPaid}
-                    onChange={e => setActualAmountPaid(e.target.value)}
-                    placeholder={`Auto (₹${itemsTotal})`}
+                    value={advancePaid}
+                    onChange={e => setAdvancePaid(e.target.value)}
+                    placeholder="0"
+                    className="w-full pl-6 pr-2 py-1.5 border border-border rounded-lg text-xs bg-background font-bold text-primary"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Balance Paid</label>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-primary text-xs font-bold">₹</span>
+                  <input
+                    type="number"
+                    value={balancePaid}
+                    onChange={e => setBalancePaid(e.target.value)}
+                    placeholder="0"
                     className="w-full pl-6 pr-2 py-1.5 border border-border rounded-lg text-xs bg-background font-bold text-primary"
                   />
                 </div>
               </div>
             </div>
-            <div>
-              <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Payment Status</label>
-              <select
-                value={paymentStatus}
-                onChange={e => setPaymentStatus(e.target.value)}
-                className="w-full border border-border rounded-lg px-2.5 py-1.5 text-xs bg-background"
-              >
-                <option value="Unpaid">Unpaid (చెల్లించలేదు)</option>
-                <option value="Paid">Paid (చెల్లించారు)</option>
-              </select>
+            
+            <div className="bg-muted/30 p-2.5 rounded-lg text-xs flex justify-between items-center font-semibold">
+              <span className="text-muted-foreground">Pending Balance:</span>
+              <span className={`font-bold text-sm ${pendingBalance > 0.01 ? 'text-destructive' : 'text-emerald-600'}`}>
+                ₹{pendingBalance.toFixed(2)}
+              </span>
             </div>
           </div>
         )}
@@ -341,7 +376,8 @@ function CreateOrderModal({ onClose }: { onClose: () => void }) {
 
   // Finance fields
   const [actualShippingCost, setActualShippingCost] = useState('0');
-  const [actualAmountPaid, setActualAmountPaid] = useState('');
+  const [advancePaid, setAdvancePaid] = useState('0');
+  const [balancePaid, setBalancePaid] = useState('0');
   const [paymentStatus, setPaymentStatus] = useState<string>('Unpaid');
   const [status, setStatus] = useState<string>('Confirmed');
 
@@ -359,6 +395,23 @@ function CreateOrderModal({ onClose }: { onClose: () => void }) {
     },
   });
 
+  // Calculate items total
+  const itemsTotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const expectedTotal = itemsTotal + (Number(actualShippingCost) || 0);
+  const totalPaid = (Number(advancePaid) || 0) + (Number(balancePaid) || 0);
+  const pendingBalance = expectedTotal - totalPaid;
+
+  // Automatically adjust paymentStatus based on totalPaid vs expectedTotal
+  useEffect(() => {
+    if (totalPaid === 0) {
+      setPaymentStatus('Unpaid');
+    } else if (totalPaid >= expectedTotal) {
+      setPaymentStatus('Paid');
+    } else {
+      setPaymentStatus('Partially Paid');
+    }
+  }, [totalPaid, expectedTotal]);
+
   const createMutation = useMutation({
     mutationFn: async () => {
       const res = await api.post('/admin/orders', {
@@ -369,7 +422,8 @@ function CreateOrderModal({ onClose }: { onClose: () => void }) {
         items,
         status,
         actualShippingCost: Number(actualShippingCost) || 0,
-        actualAmountPaid: actualAmountPaid !== '' ? Number(actualAmountPaid) : null,
+        advancePaid: Number(advancePaid) || 0,
+        balancePaid: Number(balancePaid) || 0,
         paymentStatus,
       });
       return res.data;
@@ -379,9 +433,6 @@ function CreateOrderModal({ onClose }: { onClose: () => void }) {
       onClose();
     },
   });
-
-  // Calculate items total
-  const itemsTotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40">
@@ -597,9 +648,10 @@ function CreateOrderModal({ onClose }: { onClose: () => void }) {
               <select
                 value={paymentStatus}
                 onChange={e => setPaymentStatus(e.target.value)}
-                className="w-full border border-border rounded-lg px-2.5 py-1.5 text-xs bg-background"
+                className="w-full border border-border rounded-lg px-2.5 py-1.5 text-xs bg-background font-semibold"
               >
                 <option value="Unpaid">Unpaid (చెల్లించలేదు)</option>
+                <option value="Partially Paid">Partially Paid (పాక్షికంగా)</option>
                 <option value="Paid">Paid (చెల్లించారు)</option>
               </select>
             </div>
@@ -618,16 +670,39 @@ function CreateOrderModal({ onClose }: { onClose: () => void }) {
               </div>
             </div>
             <div>
-              <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Actual Amount Paid</label>
+              <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Advance Paid</label>
               <div className="relative">
                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-primary text-xs font-bold">₹</span>
                 <input
                   type="number"
-                  value={actualAmountPaid}
-                  onChange={e => setActualAmountPaid(e.target.value)}
-                  placeholder={`Auto (₹${itemsTotal})`}
+                  value={advancePaid}
+                  onChange={e => setAdvancePaid(e.target.value)}
+                  placeholder="0"
                   className="w-full pl-6 pr-2 py-1.5 border border-border rounded-lg text-xs bg-background font-bold text-primary"
                 />
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Balance Paid</label>
+              <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-primary text-xs font-bold">₹</span>
+                <input
+                  type="number"
+                  value={balancePaid}
+                  onChange={e => setBalancePaid(e.target.value)}
+                  placeholder="0"
+                  className="w-full pl-6 pr-2 py-1.5 border border-border rounded-lg text-xs bg-background font-bold text-primary"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col justify-end">
+              <div className="bg-muted/30 p-2.5 rounded-lg text-[11px] flex justify-between items-center font-semibold h-[34px]">
+                <span className="text-muted-foreground">Pending:</span>
+                <span className={`font-bold ${pendingBalance > 0.01 ? 'text-destructive' : 'text-emerald-600'}`}>
+                  ₹{pendingBalance.toFixed(2)}
+                </span>
               </div>
             </div>
           </div>
@@ -708,19 +783,42 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
           {order.orderNumber && (
             <>
               <div><p className="text-xs text-muted-foreground">Payment Status</p>
-                <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', order.paymentStatus === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')}>
+                <span className={cn(
+                  'text-xs font-semibold px-2 py-0.5 rounded-full',
+                  order.paymentStatus === 'Paid'
+                    ? 'bg-green-100 text-green-700'
+                    : order.paymentStatus === 'Partially Paid'
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'bg-red-100 text-red-700'
+                )}>
                   {order.paymentStatus || 'Unpaid'}
                 </span>
-              </div>
-              <div><p className="text-xs text-muted-foreground">Actual Paid Amount</p>
-                <p className="font-semibold text-primary">
-                  {order.actualAmountPaid !== null && order.actualAmountPaid !== undefined ? `₹${order.actualAmountPaid}` : '-'}
-                </p>
               </div>
               <div><p className="text-xs text-muted-foreground">Actual Courier Cost</p>
                 <p className="font-semibold text-zinc-700">
                   {order.actualShippingCost !== undefined ? `₹${order.actualShippingCost}` : '₹0'}
                 </p>
+              </div>
+              <div><p className="text-xs text-muted-foreground">Advance Paid</p>
+                <p className="font-semibold text-zinc-700">
+                  ₹{order.advancePaid ?? 0}
+                </p>
+              </div>
+              <div><p className="text-xs text-muted-foreground">Balance Paid</p>
+                <p className="font-semibold text-zinc-700">
+                  ₹{order.balancePaid ?? 0}
+                </p>
+              </div>
+              <div className="col-span-2 bg-muted/30 p-2 rounded-lg flex justify-between items-center text-xs font-medium">
+                <span className="text-muted-foreground">Pending Balance:</span>
+                <span className={cn(
+                  'font-bold text-sm',
+                  (total + (order.actualShippingCost ?? 0) - (order.actualAmountPaid ?? 0)) > 0.01
+                    ? 'text-destructive'
+                    : 'text-emerald-600'
+                )}>
+                  ₹{Math.max(0, (total + (order.actualShippingCost ?? 0)) - (order.actualAmountPaid ?? 0)).toFixed(0)}
+                </span>
               </div>
             </>
           )}
@@ -808,7 +906,7 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
 export function AdminOrders() {
   const queryClient = useQueryClient();
   const { showConfirm } = useModalStore();
-  const [activeTab, setActiveTab] = useState<'pending' | 'active'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'active' | 'pending-payments'>('pending');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
@@ -826,7 +924,6 @@ export function AdminOrders() {
   const [statusModalOrder, setStatusModalOrder] = useState<Order | null>(null);
   const [statusModalNextStatus, setStatusModalNextStatus] = useState<string>('');
   const [shippingCostInput, setShippingCostInput] = useState<string>('');
-  const [amountPaidInput, setAmountPaidInput] = useState<string>('');
   const [markAsPaidInput, setMarkAsPaidInput] = useState<boolean>(false);
 
   const { data: orders = [], isLoading } = useQuery<Order[]>({
@@ -854,22 +951,36 @@ export function AdminOrders() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status, actualShippingCost, actualAmountPaid, paymentStatus }: { id: string; status?: string; actualShippingCost?: number; actualAmountPaid?: number | null; paymentStatus?: string }) => {
-      const res = await api.put(`/orders/${id}/status`, { status, actualShippingCost, actualAmountPaid, paymentStatus });
+    mutationFn: async ({ id, status, actualShippingCost, actualAmountPaid, paymentStatus, advancePaid, balancePaid }: { id: string; status?: string; actualShippingCost?: number; actualAmountPaid?: number | null; paymentStatus?: string; advancePaid?: number; balancePaid?: number }) => {
+      const res = await api.put(`/orders/${id}/status`, { status, actualShippingCost, actualAmountPaid, paymentStatus, advancePaid, balancePaid });
       return res.data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-orders'] }),
   });
 
   const togglePaymentStatus = (order: Order) => {
-    const nextPaymentStatus = order.paymentStatus === 'Paid' ? 'Unpaid' : 'Paid';
-    updateStatusMutation.mutate({
-      id: order.id,
-      paymentStatus: nextPaymentStatus,
-      actualAmountPaid: nextPaymentStatus === 'Paid'
-        ? (order.actualAmountPaid !== null && order.actualAmountPaid !== undefined ? order.actualAmountPaid : total(order))
-        : null,
-    });
+    const isPaid = order.paymentStatus === 'Paid';
+    const orderTotal = total(order) + (order.actualShippingCost ?? 0);
+    
+    if (isPaid) {
+      updateStatusMutation.mutate({
+        id: order.id,
+        paymentStatus: 'Unpaid',
+        advancePaid: 0,
+        balancePaid: 0,
+        actualAmountPaid: 0,
+      });
+    } else {
+      const currentAdvance = order.advancePaid ?? 0;
+      const neededBalance = Math.max(0, orderTotal - currentAdvance);
+      updateStatusMutation.mutate({
+        id: order.id,
+        paymentStatus: 'Paid',
+        advancePaid: currentAdvance,
+        balancePaid: neededBalance,
+        actualAmountPaid: orderTotal,
+      });
+    }
   };
 
   const handleWhatsAppNotify = (order: Order) => {
@@ -899,7 +1010,6 @@ export function AdminOrders() {
       setStatusModalOrder(order);
       setStatusModalNextStatus(nextStatus);
       setShippingCostInput((order.actualShippingCost ?? collected).toString());
-      setAmountPaidInput((order.actualAmountPaid ?? total(order)).toString());
       setMarkAsPaidInput(order.paymentStatus === 'Paid' || nextStatus === 'Delivered');
       setStatusModalOpen(true);
     } else {
@@ -910,17 +1020,30 @@ export function AdminOrders() {
   const handleSaveStatusModal = () => {
     if (!statusModalOrder) return;
     const cost = parseFloat(shippingCostInput) || 0;
-    const amountPaid = statusModalNextStatus === 'Delivered'
-      ? (markAsPaidInput ? (parseFloat(amountPaidInput) || 0) : null)
-      : undefined;
-    const payStatus = markAsPaidInput ? 'Paid' : 'Unpaid';
-
+    const orderTotal = total(statusModalOrder) + cost;
+    const currentAdvance = statusModalOrder.advancePaid ?? 0;
+    
+    let nextAdvance = currentAdvance;
+    let nextBalance = statusModalOrder.balancePaid ?? 0;
+    let payStatus = statusModalOrder.paymentStatus;
+    
+    if (statusModalNextStatus === 'Delivered') {
+      if (markAsPaidInput) {
+        nextBalance = Math.max(0, orderTotal - currentAdvance);
+        payStatus = 'Paid';
+      } else {
+        payStatus = currentAdvance > 0 ? 'Partially Paid' : 'Unpaid';
+      }
+    }
+    
     updateStatusMutation.mutate({
       id: statusModalOrder.id,
       status: statusModalNextStatus,
       actualShippingCost: cost,
-      actualAmountPaid: amountPaid,
+      advancePaid: nextAdvance,
+      balancePaid: nextBalance,
       paymentStatus: payStatus,
+      actualAmountPaid: nextAdvance + nextBalance,
     });
 
     setStatusModalOpen(false);
@@ -938,7 +1061,15 @@ export function AdminOrders() {
   const pendingOrders = orders.filter(o => o.status === 'Pending Approval');
   const activeOrders = orders.filter(o => o.status !== 'Pending Approval');
 
-  const filteredActive = activeOrders.filter(order => {
+  const pendingPaymentsOrders = activeOrders.filter(order => {
+    if (order.status === 'Cancelled') return false;
+    const orderTotal = total(order) + (order.actualShippingCost ?? 0);
+    const paid = order.actualAmountPaid !== null && order.actualAmountPaid !== undefined ? order.actualAmountPaid : 0;
+    return orderTotal - paid > 0.01;
+  });
+  const pendingPaymentsCount = pendingPaymentsOrders.length;
+
+  const filteredActive = (activeTab === 'pending-payments' ? pendingPaymentsOrders : activeOrders).filter(order => {
     // 1. Status Filter Tab
     if (filterStatus !== 'all' && order.status !== filterStatus) return false;
     
@@ -1039,7 +1170,7 @@ export function AdminOrders() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-muted/50 rounded-xl p-1 mb-6 w-fit">
+      <div className="flex gap-1 bg-muted/50 rounded-xl p-1 mb-6 w-fit flex-wrap">
         <button
           onClick={() => setActiveTab('pending')}
           className={cn(
@@ -1067,6 +1198,21 @@ export function AdminOrders() {
           <span className="bg-muted text-muted-foreground text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
             {activeOrders.length}
           </span>
+        </button>
+        <button
+          onClick={() => setActiveTab('pending-payments')}
+          className={cn(
+            'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+            activeTab === 'pending-payments' ? 'bg-white shadow-sm text-red-700' : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <AlertCircle className="h-4 w-4 text-red-600" />
+          Pending Payments
+          {pendingPaymentsCount > 0 && (
+            <span className="bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+              {pendingPaymentsCount}
+            </span>
+          )}
         </button>
       </div>
 
@@ -1167,7 +1313,7 @@ export function AdminOrders() {
       )}
 
       {/* ── Active Orders Tab ── */}
-      {activeTab === 'active' && (
+      {(activeTab === 'active' || activeTab === 'pending-payments') && (
         <div>
           {/* Status filter */}
           <div className="flex flex-wrap gap-2 mb-4">
@@ -1330,28 +1476,44 @@ export function AdminOrders() {
                             </div>
                           </td>
                           <td className="px-4 py-3">
-                            <div className="flex flex-col gap-1 items-start">
+                            <div className="flex flex-col gap-0.5 items-start">
                               <button
                                 onClick={() => togglePaymentStatus(order)}
                                 disabled={updateStatusMutation.isPending}
                                 className={cn(
-                                  'text-xs font-semibold px-2.5 py-1 rounded-full transition-all duration-150 active:scale-95 flex items-center gap-1',
+                                  'text-[10px] font-semibold px-2 py-0.5 rounded-full transition-all duration-150 active:scale-95 flex items-center gap-1',
                                   order.paymentStatus === 'Paid'
                                     ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                    : order.paymentStatus === 'Partially Paid'
+                                    ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
                                     : 'bg-red-100 text-red-700 hover:bg-red-200'
                                 )}
                                 title="Click to toggle payment status"
                               >
-                                <span className={cn('h-1.5 w-1.5 rounded-full', order.paymentStatus === 'Paid' ? 'bg-green-500' : 'bg-red-500')} />
-                                {order.paymentStatus === 'Paid' ? 'Paid' : 'Unpaid'}
+                                <span className={cn(
+                                  'h-1.5 w-1.5 rounded-full',
+                                  order.paymentStatus === 'Paid'
+                                    ? 'bg-green-500'
+                                    : order.paymentStatus === 'Partially Paid'
+                                    ? 'bg-amber-500'
+                                    : 'bg-red-500'
+                                )} />
+                                {order.paymentStatus === 'Paid'
+                                  ? 'Paid'
+                                  : order.paymentStatus === 'Partially Paid'
+                                  ? 'Partial'
+                                  : 'Unpaid'}
                               </button>
-                              {order.paymentStatus === 'Paid' && (
-                                <span className="text-xs text-muted-foreground font-medium pl-1">
-                                  {order.actualAmountPaid !== null && order.actualAmountPaid !== undefined
-                                    ? `₹${order.actualAmountPaid}`
-                                    : `₹${total(order).toFixed(0)}`}
-                                </span>
-                              )}
+                              
+                              <span className="text-[10px] text-muted-foreground font-medium pl-1 mt-0.5">
+                                {order.paymentStatus === 'Paid' ? (
+                                  `₹${order.actualAmountPaid ?? (total(order) + (order.actualShippingCost ?? 0)).toFixed(0)}`
+                                ) : order.paymentStatus === 'Partially Paid' ? (
+                                  `Paid: ₹${order.actualAmountPaid ?? 0} (Pending: ₹${Math.max(0, (total(order) + (order.actualShippingCost ?? 0)) - (order.actualAmountPaid ?? 0)).toFixed(0)})`
+                                ) : (
+                                  `Pending: ₹${(total(order) + (order.actualShippingCost ?? 0)).toFixed(0)}`
+                                )}
+                              </span>
                             </div>
                           </td>
                           <td className="px-4 py-3 text-right font-semibold text-primary">₹{total(order).toFixed(0)}</td>
@@ -1414,19 +1576,40 @@ export function AdminOrders() {
                           <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 pointer-events-none opacity-60" />
                         </div>
 
-                        <button
-                          onClick={() => togglePaymentStatus(order)}
-                          disabled={updateStatusMutation.isPending}
-                          className={cn(
-                            'text-[11px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 transition-all active:scale-95',
-                            order.paymentStatus === 'Paid'
-                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                              : 'bg-red-100 text-red-700 hover:bg-red-200'
-                          )}
-                        >
-                          <span className={cn('h-1.5 w-1.5 rounded-full', order.paymentStatus === 'Paid' ? 'bg-green-500' : 'bg-red-500')} />
-                          {order.paymentStatus === 'Paid' ? `Paid (₹${order.actualAmountPaid ?? total(order).toFixed(0)})` : 'Unpaid'}
-                        </button>
+                        <div className="flex flex-col items-end">
+                          <button
+                            onClick={() => togglePaymentStatus(order)}
+                            disabled={updateStatusMutation.isPending}
+                            className={cn(
+                              'text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 transition-all active:scale-95',
+                              order.paymentStatus === 'Paid'
+                                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                : order.paymentStatus === 'Partially Paid'
+                                ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                                : 'bg-red-100 text-red-700 hover:bg-red-200'
+                            )}
+                          >
+                            <span className={cn(
+                              'h-1 w-1 rounded-full',
+                              order.paymentStatus === 'Paid' ? 'bg-green-500' : order.paymentStatus === 'Partially Paid' ? 'bg-amber-500' : 'bg-red-500'
+                            )} />
+                            {order.paymentStatus === 'Paid'
+                              ? 'Paid'
+                              : order.paymentStatus === 'Partially Paid'
+                              ? 'Partial'
+                              : 'Unpaid'}
+                          </button>
+                          
+                          <span className="text-[10px] text-muted-foreground mt-0.5">
+                            {order.paymentStatus === 'Paid' ? (
+                              `₹${order.actualAmountPaid ?? (total(order) + (order.actualShippingCost ?? 0)).toFixed(0)}`
+                            ) : order.paymentStatus === 'Partially Paid' ? (
+                              `Paid: ₹${order.actualAmountPaid ?? 0} (Pending: ₹${Math.max(0, (total(order) + (order.actualShippingCost ?? 0)) - (order.actualAmountPaid ?? 0)).toFixed(0)})`
+                            ) : (
+                              `Pending: ₹${(total(order) + (order.actualShippingCost ?? 0)).toFixed(0)}`
+                            )}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="flex justify-end gap-1.5 pt-2 border-t border-border/10">
@@ -1491,23 +1674,19 @@ export function AdminOrders() {
               {/* Customer Paid Amount Input (Only show when marking as Delivered) */}
               {statusModalNextStatus === 'Delivered' && (
                 <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-semibold text-foreground mb-1.5 block">
-                      Actual Amount Paid by Customer (Inflow)
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary text-sm font-bold">₹</span>
-                      <input
-                        type="number"
-                        value={amountPaidInput}
-                        onChange={(e) => setAmountPaidInput(e.target.value)}
-                        placeholder="e.g. 500"
-                        className="w-full pl-7 pr-3 py-2 rounded-lg border border-border text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 font-bold text-primary"
-                      />
+                  <div className="bg-muted/30 p-3 rounded-xl text-xs space-y-1.5 font-medium">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Order Total (Items + Shipping):</span>
+                      <span className="font-bold text-foreground">₹{(total(statusModalOrder) + parseFloat(shippingCostInput || '0')).toFixed(0)}</span>
                     </div>
-                    <p className="text-[11px] text-muted-foreground mt-1">
-                      Enter the exact amount collected from the customer.
-                    </p>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Advance Paid already:</span>
+                      <span className="font-bold text-emerald-600">₹{(statusModalOrder.advancePaid ?? 0).toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between border-t border-border/40 pt-1.5 font-bold">
+                      <span className="text-muted-foreground">Remaining Balance due:</span>
+                      <span className="text-destructive">₹{Math.max(0, (total(statusModalOrder) + parseFloat(shippingCostInput || '0')) - (statusModalOrder.advancePaid ?? 0)).toFixed(0)}</span>
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -1515,16 +1694,11 @@ export function AdminOrders() {
                       type="checkbox"
                       id="markAsPaidCheckbox"
                       checked={markAsPaidInput}
-                      onChange={(e) => {
-                        setMarkAsPaidInput(e.target.checked);
-                        if (e.target.checked && !amountPaidInput) {
-                          setAmountPaidInput(total(statusModalOrder).toString());
-                        }
-                      }}
+                      onChange={(e) => setMarkAsPaidInput(e.target.checked)}
                       className="h-4 w-4 rounded border-border text-primary focus:ring-primary bg-background cursor-pointer"
                     />
                     <label htmlFor="markAsPaidCheckbox" className="text-sm font-semibold text-foreground select-none cursor-pointer">
-                      Payment Received (Mark as Paid)
+                      Mark Remaining Balance as Paid (రసీదు పొందినాము)
                     </label>
                   </div>
                 </div>

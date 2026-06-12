@@ -205,9 +205,14 @@ export async function generateOrderPDF(order: any): Promise<void> {
 
   // Totals calculations
   const subtotal = (order.items || []).reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0);
-  const deliveryCharge = order.deliveryCharge ?? 0;
+  const deliveryCharge = order.actualShippingCost ?? order.deliveryCharge ?? 0;
   const discount = order.discount ?? 0;
   const grandTotal = subtotal + deliveryCharge - discount;
+  
+  const advancePaid = order.advancePaid ?? 0;
+  const balancePaid = order.balancePaid ?? 0;
+  const totalPaid = advancePaid + balancePaid;
+  const pendingBalance = Math.max(0, grandTotal - totalPaid);
 
   currentY += 6;
 
@@ -230,7 +235,7 @@ export async function generateOrderPDF(order: any): Promise<void> {
   doc.text(`INR ${subtotal.toFixed(2)}`, 195, currentY, { align: 'right' });
   
   currentY += 6;
-  doc.text('Delivery Charge:', 150, currentY, { align: 'right' });
+  doc.text('Shipping / Delivery:', 150, currentY, { align: 'right' });
   doc.text(`INR ${deliveryCharge.toFixed(2)}`, 195, currentY, { align: 'right' });
   
   if (discount > 0) {
@@ -239,6 +244,22 @@ export async function generateOrderPDF(order: any): Promise<void> {
     doc.text(`-INR ${discount.toFixed(2)}`, 195, currentY, { align: 'right' });
   }
 
+  currentY += 6;
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+  doc.text('Grand Total:', 150, currentY, { align: 'right' });
+  doc.text(`INR ${grandTotal.toFixed(2)}`, 195, currentY, { align: 'right' });
+
+  currentY += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(secondaryTextColor[0], secondaryTextColor[1], secondaryTextColor[2]);
+  doc.text('Advance Paid:', 150, currentY, { align: 'right' });
+  doc.text(`-INR ${advancePaid.toFixed(2)}`, 195, currentY, { align: 'right' });
+
+  currentY += 6;
+  doc.text('Balance Paid:', 150, currentY, { align: 'right' });
+  doc.text(`-INR ${balancePaid.toFixed(2)}`, 195, currentY, { align: 'right' });
+
   currentY += 8;
   // Border line for total
   doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -246,10 +267,14 @@ export async function generateOrderPDF(order: any): Promise<void> {
   doc.line(130, currentY - 5, 195, currentY - 5);
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.text('Grand Total:', 150, currentY, { align: 'right' });
-  doc.text(`INR ${grandTotal.toFixed(2)}`, 195, currentY, { align: 'right' });
+  doc.setFontSize(11);
+  if (pendingBalance > 0.01) {
+    doc.setTextColor(200, 0, 0); // red
+  } else {
+    doc.setTextColor(0, 128, 0); // green
+  }
+  doc.text('Pending Balance:', 150, currentY, { align: 'right' });
+  doc.text(`INR ${pendingBalance.toFixed(2)}`, 195, currentY, { align: 'right' });
 
   // Reset line width
   doc.setLineWidth(0.2);

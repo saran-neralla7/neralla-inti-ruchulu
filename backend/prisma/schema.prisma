@@ -73,6 +73,10 @@ model Order {
   actualShippingCost Float       @default(0.0)
   actualAmountPaid   Float?
   paymentStatus      String      @default("Unpaid")
+  advancePaid        Float       @default(0.0)
+  advancePaidAt      DateTime?
+  balancePaid        Float       @default(0.0)
+  balancePaidAt      DateTime?
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
   items              OrderItem[]

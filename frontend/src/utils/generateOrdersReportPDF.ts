@@ -123,19 +123,32 @@ export async function generateOrdersReportPDF(orders: Order[], filters: ReportFi
   // ─── CALCULATE SUMMARY TOTALS ───
   const totalOrders = sortedOrders.length;
   
-  const getOrderTotal = (o: Order) => o.items.reduce((s, i) => s + i.price * i.quantity, 0);
+  const getOrderPaymentBreakdown = (o: Order) => {
+    const itemsTotal = o.items.reduce((s, i) => s + i.price * i.quantity, 0);
+    const shipping = o.actualShippingCost ?? 0;
+    const expectedTotal = itemsTotal + shipping;
+    
+    let paid = 0;
+    if (o.advancePaid !== undefined && o.balancePaid !== undefined) {
+      paid = (o.advancePaid ?? 0) + (o.balancePaid ?? 0);
+    } else if (o.actualAmountPaid !== null && o.actualAmountPaid !== undefined) {
+      paid = o.actualAmountPaid;
+    } else if (o.paymentStatus === 'Paid') {
+      paid = expectedTotal;
+    }
+    
+    const pending = o.status === 'Cancelled' ? 0 : Math.max(0, expectedTotal - paid);
+    return { expectedTotal, paid, pending };
+  };
 
   let totalCollected = 0;
   let totalOutstanding = 0;
   let totalCourierCost = 0;
 
   sortedOrders.forEach(o => {
-    const orderTotal = o.actualAmountPaid !== null && o.actualAmountPaid !== undefined ? o.actualAmountPaid : getOrderTotal(o);
-    if (o.paymentStatus === 'Paid') {
-      totalCollected += orderTotal;
-    } else {
-      totalOutstanding += orderTotal;
-    }
+    const { paid, pending } = getOrderPaymentBreakdown(o);
+    totalCollected += paid;
+    totalOutstanding += pending;
     totalCourierCost += o.actualShippingCost ?? 0;
   });
 
@@ -203,12 +216,13 @@ export async function generateOrdersReportPDF(orders: Order[], filters: ReportFi
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(secondaryTextColor[0], secondaryTextColor[1], secondaryTextColor[2]);
-  doc.text('ORDER NO', 17, tableY + 5.5);
-  doc.text('DATE', 46, tableY + 5.5);
-  doc.text('CUSTOMER', 70, tableY + 5.5);
-  doc.text('STATUS', 115, tableY + 5.5);
-  doc.text('PAYMENT', 145, tableY + 5.5);
-  doc.text('AMOUNT', 193, tableY + 5.5, { align: 'right' });
+  doc.text('ORDER NO', 16, tableY + 5.5);
+  doc.text('DATE', 42, tableY + 5.5);
+  doc.text('CUSTOMER', 62, tableY + 5.5);
+  doc.text('STATUS', 105, tableY + 5.5);
+  doc.text('PAID', 133, tableY + 5.5, { align: 'right' });
+  doc.text('PENDING', 163, tableY + 5.5, { align: 'right' });
+  doc.text('TOTAL', 194, tableY + 5.5, { align: 'right' });
 
   // Rows
   let curY = tableY + 8;
@@ -233,12 +247,13 @@ export async function generateOrdersReportPDF(orders: Order[], filters: ReportFi
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8.5);
       doc.setTextColor(secondaryTextColor[0], secondaryTextColor[1], secondaryTextColor[2]);
-      doc.text('ORDER NO', 17, 43.5);
-      doc.text('DATE', 46, 43.5);
-      doc.text('CUSTOMER', 70, 43.5);
-      doc.text('STATUS', 115, 43.5);
-      doc.text('PAYMENT', 145, 43.5);
-      doc.text('AMOUNT', 193, 43.5, { align: 'right' });
+      doc.text('ORDER NO', 16, 43.5);
+      doc.text('DATE', 42, 43.5);
+      doc.text('CUSTOMER', 62, 43.5);
+      doc.text('STATUS', 105, 43.5);
+      doc.text('PAID', 133, 43.5, { align: 'right' });
+      doc.text('PENDING', 163, 43.5, { align: 'right' });
+      doc.text('TOTAL', 194, 43.5, { align: 'right' });
       
       curY = 46;
       doc.setFont('helvetica', 'normal');
@@ -258,34 +273,31 @@ export async function generateOrdersReportPDF(orders: Order[], filters: ReportFi
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(textColor[0], textColor[1], textColor[2]);
     const dateStr = new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-    doc.text(dateStr, 46, curY + 5.5);
+    doc.text(dateStr, 42, curY + 5.5);
 
     // Customer
-    doc.text(o.customerName, 70, curY + 5.5);
+    const nameStr = o.customerName.length > 20 ? o.customerName.substring(0, 18) + '...' : o.customerName;
+    doc.text(nameStr, 62, curY + 5.5);
     
     // Status
-    doc.text(o.status, 115, curY + 5.5);
+    doc.text(o.status, 105, curY + 5.5);
     
-    // Payment Status and Actual amount paid if any
-    const payStatusStr = o.paymentStatus || 'Unpaid';
-    doc.setFont('helvetica', payStatusStr === 'Paid' ? 'bold' : 'normal');
-    if (payStatusStr === 'Paid') {
-      doc.setTextColor(22, 101, 52); // green-800
-      doc.text('Paid', 145, curY + 5.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-      if (o.actualAmountPaid !== null && o.actualAmountPaid !== undefined) {
-        doc.text(` (Rs. ${o.actualAmountPaid})`, 152, curY + 5.5);
-      }
+    // Paid, Pending, Total calculations
+    const { expectedTotal, paid, pending } = getOrderPaymentBreakdown(o);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Rs. ${paid.toFixed(0)}`, 133, curY + 5.5, { align: 'right' });
+
+    if (pending > 0.01) {
+      doc.setTextColor(180, 83, 9); // Amber
     } else {
-      doc.setTextColor(180, 83, 9); // Amber-700
-      doc.text('Unpaid', 145, curY + 5.5);
-      doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+      doc.setTextColor(34, 197, 94); // Green
     }
-    
+    doc.text(`Rs. ${pending.toFixed(0)}`, 163, curY + 5.5, { align: 'right' });
+
     doc.setFont('helvetica', 'bold');
-    const orderTotal = o.actualAmountPaid !== null && o.actualAmountPaid !== undefined ? o.actualAmountPaid : getOrderTotal(o);
-    doc.text(`Rs. ${orderTotal.toFixed(0)}`, 193, curY + 5.5, { align: 'right' });
+    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+    doc.text(`Rs. ${expectedTotal.toFixed(0)}`, 194, curY + 5.5, { align: 'right' });
 
     curY += 8;
   });
