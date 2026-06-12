@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -27,7 +27,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
@@ -83,7 +82,20 @@ interface PLReport {
 
 export function AdminAnalytics() {
   const [activeTab, setActiveTab] = useState<'sales' | 'pl'>('sales');
+
+  // Custom container width listeners to bypass Recharts ResponsiveContainer React 19 check
+  const lineChartRef = useRef<HTMLDivElement>(null);
+  const [lineWidth, setLineWidth] = useState(500);
   
+  const statusPieChartRef = useRef<HTMLDivElement>(null);
+  const [statusPieWidth, setStatusPieWidth] = useState(400);
+
+  const productsBarChartRef = useRef<HTMLDivElement>(null);
+  const [productsBarWidth, setProductsBarWidth] = useState(400);
+
+  const plPieChartRef = useRef<HTMLDivElement>(null);
+  const [plPieWidth, setPlPieWidth] = useState(400);
+
   // Date filters for P&L
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -133,6 +145,25 @@ export function AdminAnalytics() {
   });
 
   const isLoading = isOverviewLoading || isMonthlyLoading || isProductsLoading || isPLLoading;
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (lineChartRef.current) setLineWidth(lineChartRef.current.clientWidth || 500);
+      if (statusPieChartRef.current) setStatusPieWidth(statusPieChartRef.current.clientWidth || 400);
+      if (productsBarChartRef.current) setProductsBarWidth(productsBarChartRef.current.clientWidth || 400);
+      if (plPieChartRef.current) setPlPieWidth(plPieChartRef.current.clientWidth || 400);
+    };
+
+    handleResize();
+
+    window.addEventListener('resize', handleResize);
+    const timeout = setTimeout(handleResize, 150);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timeout);
+    };
+  }, [isLoading, activeTab]);
 
   if (isLoading) {
     return (
@@ -363,32 +394,30 @@ export function AdminAnalytics() {
           {/* Line Chart Section */}
           <div className="bg-card p-6 rounded-2xl border border-zinc-100 shadow-sm">
             <h2 className="text-lg font-bold text-zinc-900 mb-6">Revenue Trend (Last 6 Months)</h2>
-            <div className="h-80 w-full">
+            <div ref={lineChartRef} className="h-80 w-full overflow-hidden">
               {monthlyData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={monthlyData} margin={{ top: 10, right: 30, left: 10, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" />
-                    <XAxis dataKey="month" stroke="#a1a1aa" fontSize={12} tickLine={false} />
-                    <YAxis 
-                      stroke="#a1a1aa" 
-                      fontSize={12} 
-                      tickLine={false}
-                      tickFormatter={(val) => `₹${val / 1000}k`}
-                    />
-                    <Tooltip 
-                      formatter={(val: any) => [formatINR(Number(val)), 'Revenue']}
-                      contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #f4f4f5', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="revenue" 
-                      stroke="#3c1611" // Primary Maroon
-                      strokeWidth={3}
-                      activeDot={{ r: 8 }}
-                      dot={{ r: 4, fill: '#3c1611' }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                <LineChart width={lineWidth} height={320} data={monthlyData} margin={{ top: 10, right: 30, left: 10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" />
+                  <XAxis dataKey="month" stroke="#a1a1aa" fontSize={12} tickLine={false} />
+                  <YAxis 
+                    stroke="#a1a1aa" 
+                    fontSize={12} 
+                    tickLine={false}
+                    tickFormatter={(val) => `₹${val / 1000}k`}
+                  />
+                  <Tooltip 
+                    formatter={(val: any) => [formatINR(Number(val)), 'Revenue']}
+                    contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #f4f4f5', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="revenue" 
+                    stroke="#3c1611" // Primary Maroon
+                    strokeWidth={3}
+                    activeDot={{ r: 8 }}
+                    dot={{ r: 4, fill: '#3c1611' }}
+                  />
+                </LineChart>
               ) : (
                 <div className="h-full flex items-center justify-center text-zinc-400 flex-col gap-2">
                   <TrendingUp className="h-10 w-10 text-zinc-300" />
@@ -403,27 +432,25 @@ export function AdminAnalytics() {
             {/* Left: Pie Chart */}
             <div className="bg-card p-6 rounded-2xl border border-zinc-100 shadow-sm flex flex-col justify-between">
               <h2 className="text-lg font-bold text-zinc-900 mb-4">Order Status Distribution</h2>
-              <div className="h-72 w-full relative">
+              <div ref={statusPieChartRef} className="h-72 w-full relative flex items-center justify-center overflow-hidden">
                 {pieData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={65}
-                        outerRadius={90}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => [value, 'Orders']} />
-                      <Legend verticalAlign="bottom" height={36} iconType="circle" />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <PieChart width={statusPieWidth} height={280}>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={65}
+                      outerRadius={90}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [value, 'Orders']} />
+                    <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                  </PieChart>
                 ) : (
                   <div className="h-full flex items-center justify-center text-zinc-400 flex-col gap-2">
                     <PackageCheck className="h-10 w-10 text-zinc-300" />
@@ -436,24 +463,22 @@ export function AdminAnalytics() {
             {/* Right: Top Products */}
             <div className="bg-card p-6 rounded-2xl border border-zinc-100 shadow-sm flex flex-col justify-between">
               <h2 className="text-lg font-bold text-zinc-900 mb-4">Top 5 Products (by Revenue)</h2>
-              <div className="h-72 w-full">
+              <div ref={productsBarChartRef} className="h-72 w-full overflow-hidden">
                 {barData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={barData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" horizontal={false} />
-                      <XAxis type="number" stroke="#a1a1aa" fontSize={11} tickLine={false} tickFormatter={(val) => `₹${val}`} />
-                      <YAxis dataKey="name" type="category" stroke="#a1a1aa" fontSize={11} tickLine={false} width={120} />
-                      <Tooltip 
-                        formatter={(val: any) => [formatINR(Number(val)), 'Revenue']}
-                        contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #f4f4f5' }}
-                      />
-                      <Bar dataKey="revenue" fill="#5d8a3c" radius={[0, 8, 8, 0]} barSize={20}>
-                        {barData.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={index === 0 ? '#3c1611' : '#5d8a3c'} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <BarChart width={productsBarWidth} height={280} data={barData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" horizontal={false} />
+                    <XAxis type="number" stroke="#a1a1aa" fontSize={11} tickLine={false} tickFormatter={(val) => `₹${val}`} />
+                    <YAxis dataKey="name" type="category" stroke="#a1a1aa" fontSize={11} tickLine={false} width={120} />
+                    <Tooltip 
+                      formatter={(val: any) => [formatINR(Number(val)), 'Revenue']}
+                      contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #f4f4f5' }}
+                    />
+                    <Bar dataKey="revenue" fill="#5d8a3c" radius={[0, 8, 8, 0]} barSize={20}>
+                      {barData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={index === 0 ? '#3c1611' : '#5d8a3c'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
                 ) : (
                   <div className="h-full flex items-center justify-center text-zinc-400 flex-col gap-2">
                     <ShoppingBag className="h-10 w-10 text-zinc-300" />
@@ -642,27 +667,25 @@ export function AdminAnalytics() {
                 <p className="text-xs text-muted-foreground">Outflow breakdown by cost category</p>
               </div>
               
-              <div className="h-72 w-full relative mt-4">
+              <div ref={plPieChartRef} className="h-72 w-full relative mt-4 flex items-center justify-center overflow-hidden">
                 {plPieData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={plPieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={85}
-                        paddingAngle={4}
-                        dataKey="value"
-                      >
-                        {plPieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => [`₹${Number(value).toLocaleString('en-IN')}`, 'Amount']} />
-                      <Legend verticalAlign="bottom" height={42} iconType="circle" wrapperStyle={{ fontSize: '11px' }} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <PieChart width={plPieWidth} height={280}>
+                    <Pie
+                      data={plPieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={85}
+                      paddingAngle={4}
+                      dataKey="value"
+                    >
+                      {plPieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [`₹${Number(value).toLocaleString('en-IN')}`, 'Amount']} />
+                    <Legend verticalAlign="bottom" height={42} iconType="circle" wrapperStyle={{ fontSize: '11px' }} />
+                  </PieChart>
                 ) : (
                   <div className="h-full flex items-center justify-center text-zinc-400 flex-col gap-2">
                     <TrendingDown className="h-10 w-10 text-zinc-300" />

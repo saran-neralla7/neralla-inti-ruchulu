@@ -349,6 +349,45 @@ app.post('/api/orders', async (req, res) => {
         res.status(500).json({ error: 'Failed to create order' });
     }
 });
+// Create Manual Order (Admin Only)
+app.post('/api/admin/orders', authenticateAdmin, async (req, res) => {
+    try {
+        const data = req.body;
+        // Auto-generate order number
+        const orderNumber = await generateOrderNumber();
+        const order = await prisma.order.create({
+            data: {
+                orderNumber,
+                customerName: data.customerName,
+                customerPhone: data.customerPhone,
+                customerAddress: data.customerAddress || '',
+                whatsappMessage: data.whatsappMessage || null,
+                status: data.status || 'Confirmed',
+                adminNotes: data.adminNotes || null,
+                approvedAt: new Date(),
+                actualShippingCost: Number(data.actualShippingCost) || 0,
+                actualAmountPaid: data.actualAmountPaid !== undefined && data.actualAmountPaid !== null ? Number(data.actualAmountPaid) : null,
+                paymentStatus: data.paymentStatus || 'Unpaid',
+                items: {
+                    create: (data.items || []).map((item) => ({
+                        productName_en: item.productName_en || item.name_en || '',
+                        productName_te: item.productName_te || item.name_te || '',
+                        variantSize: item.variantSize || item.size || '',
+                        variantPackaging: item.variantPackaging || item.packaging || '',
+                        quantity: Number(item.quantity) || 1,
+                        price: Number(item.price) || 0,
+                    }))
+                }
+            },
+            include: { items: true }
+        });
+        res.json(order);
+    }
+    catch (error) {
+        console.error('Failed to create manual order:', error);
+        res.status(500).json({ error: 'Failed to create manual order', details: error.message || String(error) });
+    }
+});
 // Approve Order — assigns order number, sets status to Confirmed (Admin Only)
 app.put('/api/orders/:id/approve', authenticateAdmin, async (req, res) => {
     const id = req.params.id;

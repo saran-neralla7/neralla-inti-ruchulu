@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   CheckCircle2, Clock,
   Trash2, Edit2, X, ChevronDown, MessageSquare,
-  PackageCheck, AlertCircle, Eye, FileText
+  PackageCheck, AlertCircle, Eye, FileText, Plus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -42,6 +42,20 @@ function EditOrderDrawer({ order, onClose }: { order: Order; onClose: () => void
   );
   const [paymentStatus, setPaymentStatus] = useState<string>(order.paymentStatus || 'Unpaid');
 
+  // Add item inputs
+  const [selectedAddProductId, setSelectedAddProductId] = useState('');
+  const [selectedAddVariantId, setSelectedAddVariantId] = useState('');
+  const [addQuantity, setAddQuantity] = useState(1);
+  const [addPrice, setAddPrice] = useState('0');
+
+  const { data: products = [] } = useQuery<any[]>({
+    queryKey: ['products'],
+    queryFn: async () => {
+      const res = await api.get('/products');
+      return res.data;
+    },
+  });
+
   const editMutation = useMutation({
     mutationFn: async () => {
       const res = await api.put(`/orders/${order.id}`, {
@@ -61,6 +75,9 @@ function EditOrderDrawer({ order, onClose }: { order: Order; onClose: () => void
       onClose();
     },
   });
+
+  // Calculate items total
+  const itemsTotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40">
@@ -83,31 +100,163 @@ function EditOrderDrawer({ order, onClose }: { order: Order; onClose: () => void
         {/* Items */}
         <div className="space-y-2">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Order Items</p>
-          {items.map((item: any, idx: number) => (
-            <div key={idx} className="grid grid-cols-12 gap-2 items-center p-2 bg-muted/30 rounded-lg">
-              <div className="col-span-5 text-xs font-medium text-foreground truncate">{item.productName_en}</div>
-              <div className="col-span-2 text-xs text-muted-foreground">{item.variantSize}</div>
-              <div className="col-span-2">
-                <input
-                  type="number" min={1}
-                  value={item.quantity}
-                  onChange={e => setItems(prev => prev.map((it: any, i: number) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))}
-                  className="w-full border border-border rounded px-1 py-0.5 text-xs bg-background text-center"
-                />
-              </div>
-              <div className="col-span-2">
-                <input
-                  type="number" min={0}
-                  value={item.price}
-                  onChange={e => setItems(prev => prev.map((it: any, i: number) => i === idx ? { ...it, price: Number(e.target.value) } : it))}
-                  className="w-full border border-border rounded px-1 py-0.5 text-xs bg-background text-center"
-                />
-              </div>
-              <button onClick={() => setItems(prev => prev.filter((_: any, i: number) => i !== idx))} className="col-span-1 text-muted-foreground hover:text-destructive">
-                <X className="h-3.5 w-3.5" />
-              </button>
+          {items.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic">No items in this order.</p>
+          ) : (
+            items.map((item: any, idx: number) => {
+              const matchingProduct = products.find(p => p.name_en === item.productName_en);
+              return (
+                <div key={idx} className="grid grid-cols-12 gap-2 items-center p-2 bg-muted/30 rounded-lg">
+                  <div className="col-span-4 text-xs font-medium text-foreground truncate">{item.productName_en}</div>
+                  <div className="col-span-3">
+                    {matchingProduct && matchingProduct.variants.length > 0 ? (
+                      <select
+                        value={matchingProduct.variants.find((v: any) => v.size === item.variantSize && v.packaging === item.variantPackaging)?.id || ''}
+                        onChange={e => {
+                          const selectedV = matchingProduct.variants.find((v: any) => v.id === e.target.value);
+                          if (selectedV) {
+                            setItems(prev => prev.map((it: any, i: number) => i === idx ? {
+                              ...it,
+                              variantSize: selectedV.size,
+                              variantPackaging: selectedV.packaging,
+                              price: selectedV.variantPrice + selectedV.packagingCharge
+                            } : it));
+                          }
+                        }}
+                        className="w-full border border-border rounded px-1 py-0.5 text-xs bg-background"
+                      >
+                        {matchingProduct.variants.map((v: any) => (
+                          <option key={v.id} value={v.id}>
+                            {v.size} ({v.packaging}) - ₹{v.variantPrice + v.packagingCharge}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">{item.variantSize}</span>
+                    )}
+                  </div>
+                  <div className="col-span-2">
+                    <input
+                      type="number" min={1}
+                      value={item.quantity}
+                      onChange={e => setItems(prev => prev.map((it: any, i: number) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))}
+                      className="w-full border border-border rounded px-1 py-0.5 text-xs bg-background text-center"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <input
+                      type="number" min={0}
+                      value={item.price}
+                      onChange={e => setItems(prev => prev.map((it: any, i: number) => i === idx ? { ...it, price: Number(e.target.value) } : it))}
+                      className="w-full border border-border rounded px-1 py-0.5 text-xs bg-background text-center"
+                    />
+                  </div>
+                  <button onClick={() => setItems(prev => prev.filter((_: any, i: number) => i !== idx))} className="col-span-1 text-muted-foreground hover:text-destructive flex justify-center">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Add New Item section */}
+        <div className="border-t border-border/40 pt-3 space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Add New Item</p>
+          <div className="grid grid-cols-12 gap-2 items-center">
+            <div className="col-span-4">
+              <select
+                value={selectedAddProductId}
+                onChange={e => {
+                  setSelectedAddProductId(e.target.value);
+                  const prod = products.find(p => p.id === e.target.value);
+                  if (prod && prod.variants.length > 0) {
+                    setSelectedAddVariantId(prod.variants[0].id);
+                    setAddPrice((prod.variants[0].variantPrice + prod.variants[0].packagingCharge).toString());
+                  } else {
+                    setSelectedAddVariantId('');
+                    setAddPrice('0');
+                  }
+                }}
+                className="w-full border border-border rounded-lg px-2 py-1.5 text-xs bg-background"
+              >
+                <option value="">Select Product...</option>
+                {products.map(p => (
+                  <option key={p.id} value={p.id}>{p.name_en}</option>
+                ))}
+              </select>
             </div>
-          ))}
+            <div className="col-span-4">
+              <select
+                value={selectedAddVariantId}
+                disabled={!selectedAddProductId}
+                onChange={e => {
+                  setSelectedAddVariantId(e.target.value);
+                  const prod = products.find(p => p.id === selectedAddProductId);
+                  const v = prod?.variants.find((varItem: any) => varItem.id === e.target.value);
+                  if (v) {
+                    setAddPrice((v.variantPrice + v.packagingCharge).toString());
+                  }
+                }}
+                className="w-full border border-border rounded-lg px-2 py-1.5 text-xs bg-background disabled:opacity-50"
+              >
+                <option value="">Select Variant...</option>
+                {selectedAddProductId && products.find(p => p.id === selectedAddProductId)?.variants.map((v: any) => (
+                  <option key={v.id} value={v.id}>{v.size} ({v.packaging})</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-span-2">
+              <input
+                type="number"
+                min={1}
+                value={addQuantity}
+                onChange={e => setAddQuantity(Number(e.target.value))}
+                className="w-full border border-border rounded-lg px-2 py-1.5 text-xs bg-background text-center"
+                placeholder="Qty"
+              />
+            </div>
+            <div className="col-span-2">
+              <input
+                type="number"
+                min={0}
+                value={addPrice}
+                onChange={e => setAddPrice(e.target.value)}
+                className="w-full border border-border rounded-lg px-2 py-1.5 text-xs bg-background text-center font-bold text-primary"
+                placeholder="Price"
+              />
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              if (!selectedAddProductId || !selectedAddVariantId) return;
+              const prod = products.find(p => p.id === selectedAddProductId);
+              const v = prod?.variants.find((varItem: any) => varItem.id === selectedAddVariantId);
+              if (prod && v) {
+                setItems(prev => [
+                  ...prev,
+                  {
+                    productName_en: prod.name_en,
+                    productName_te: prod.name_te || '',
+                    variantSize: v.size,
+                    variantPackaging: v.packaging,
+                    quantity: addQuantity,
+                    price: Number(addPrice) || 0,
+                  }
+                ]);
+                setSelectedAddProductId('');
+                setSelectedAddVariantId('');
+                setAddQuantity(1);
+                setAddPrice('0');
+              }
+            }}
+            disabled={!selectedAddProductId || !selectedAddVariantId}
+            className="w-full py-1 h-8 text-xs border border-primary text-primary hover:bg-primary/10 rounded-xl"
+          >
+            Add Item to Order
+          </Button>
         </div>
 
         {/* Admin Notes */}
@@ -146,7 +295,7 @@ function EditOrderDrawer({ order, onClose }: { order: Order; onClose: () => void
                     type="number"
                     value={actualAmountPaid}
                     onChange={e => setActualAmountPaid(e.target.value)}
-                    placeholder="Auto (items total)"
+                    placeholder={`Auto (₹${itemsTotal})`}
                     className="w-full pl-6 pr-2 py-1.5 border border-border rounded-lg text-xs bg-background font-bold text-primary"
                   />
                 </div>
@@ -170,10 +319,328 @@ function EditOrderDrawer({ order, onClose }: { order: Order; onClose: () => void
           <Button variant="outline" onClick={onClose} className="flex-1 rounded-xl">Cancel</Button>
           <Button
             onClick={() => editMutation.mutate()}
-            disabled={editMutation.isPending}
-            className="flex-1 bg-primary hover:bg-primary/90 text-white rounded-xl"
+            disabled={editMutation.isPending || items.length === 0}
+            className="flex-1 bg-primary hover:bg-primary/90 text-white rounded-xl disabled:opacity-50"
           >
             {editMutation.isPending ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Create Order Modal ───────────────────────────────────────────────────────
+function CreateOrderModal({ onClose }: { onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [adminNotes, setAdminNotes] = useState('');
+  const [items, setItems] = useState<any[]>([]);
+
+  // Finance fields
+  const [actualShippingCost, setActualShippingCost] = useState('0');
+  const [actualAmountPaid, setActualAmountPaid] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState<string>('Unpaid');
+  const [status, setStatus] = useState<string>('Confirmed');
+
+  // Add item inputs
+  const [selectedAddProductId, setSelectedAddProductId] = useState('');
+  const [selectedAddVariantId, setSelectedAddVariantId] = useState('');
+  const [addQuantity, setAddQuantity] = useState(1);
+  const [addPrice, setAddPrice] = useState('0');
+
+  const { data: products = [] } = useQuery<any[]>({
+    queryKey: ['products'],
+    queryFn: async () => {
+      const res = await api.get('/products');
+      return res.data;
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const res = await api.post('/admin/orders', {
+        customerName,
+        customerPhone,
+        customerAddress,
+        adminNotes,
+        items,
+        status,
+        actualShippingCost: Number(actualShippingCost) || 0,
+        actualAmountPaid: actualAmountPaid !== '' ? Number(actualAmountPaid) : null,
+        paymentStatus,
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
+      onClose();
+    },
+  });
+
+  // Calculate items total
+  const itemsTotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40">
+      <div className="bg-background w-full sm:max-w-lg max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl shadow-2xl border border-border p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-headline text-lg font-bold text-foreground">Create Manual Order</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Customer details */}
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Customer Details</p>
+          <input className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background" placeholder="Customer Name *" value={customerName} onChange={e => setCustomerName(e.target.value)} />
+          <input className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background" placeholder="Phone Number *" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
+          <input className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background" placeholder="Address" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} />
+        </div>
+
+        {/* Items */}
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Order Items</p>
+          {items.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic">No items added to this order yet.</p>
+          ) : (
+            items.map((item: any, idx: number) => {
+              const matchingProduct = products.find(p => p.name_en === item.productName_en);
+              return (
+                <div key={idx} className="grid grid-cols-12 gap-2 items-center p-2 bg-muted/30 rounded-lg">
+                  <div className="col-span-4 text-xs font-medium text-foreground truncate">{item.productName_en}</div>
+                  <div className="col-span-3">
+                    {matchingProduct && matchingProduct.variants.length > 0 ? (
+                      <select
+                        value={matchingProduct.variants.find((v: any) => v.size === item.variantSize && v.packaging === item.variantPackaging)?.id || ''}
+                        onChange={e => {
+                          const selectedV = matchingProduct.variants.find((v: any) => v.id === e.target.value);
+                          if (selectedV) {
+                            setItems(prev => prev.map((it: any, i: number) => i === idx ? {
+                              ...it,
+                              variantSize: selectedV.size,
+                              variantPackaging: selectedV.packaging,
+                              price: selectedV.variantPrice + selectedV.packagingCharge
+                            } : it));
+                          }
+                        }}
+                        className="w-full border border-border rounded px-1 py-0.5 text-xs bg-background"
+                      >
+                        {matchingProduct.variants.map((v: any) => (
+                          <option key={v.id} value={v.id}>
+                            {v.size} ({v.packaging}) - ₹{v.variantPrice + v.packagingCharge}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">{item.variantSize}</span>
+                    )}
+                  </div>
+                  <div className="col-span-2">
+                    <input
+                      type="number" min={1}
+                      value={item.quantity}
+                      onChange={e => setItems(prev => prev.map((it: any, i: number) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))}
+                      className="w-full border border-border rounded px-1 py-0.5 text-xs bg-background text-center"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <input
+                      type="number" min={0}
+                      value={item.price}
+                      onChange={e => setItems(prev => prev.map((it: any, i: number) => i === idx ? { ...it, price: Number(e.target.value) } : it))}
+                      className="w-full border border-border rounded px-1 py-0.5 text-xs bg-background text-center"
+                    />
+                  </div>
+                  <button onClick={() => setItems(prev => prev.filter((_: any, i: number) => i !== idx))} className="col-span-1 text-muted-foreground hover:text-destructive flex justify-center">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Add New Item section */}
+        <div className="border-t border-border/40 pt-3 space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Add New Item</p>
+          <div className="grid grid-cols-12 gap-2 items-center">
+            <div className="col-span-4">
+              <select
+                value={selectedAddProductId}
+                onChange={e => {
+                  setSelectedAddProductId(e.target.value);
+                  const prod = products.find(p => p.id === e.target.value);
+                  if (prod && prod.variants.length > 0) {
+                    setSelectedAddVariantId(prod.variants[0].id);
+                    setAddPrice((prod.variants[0].variantPrice + prod.variants[0].packagingCharge).toString());
+                  } else {
+                    setSelectedAddVariantId('');
+                    setAddPrice('0');
+                  }
+                }}
+                className="w-full border border-border rounded-lg px-2 py-1.5 text-xs bg-background"
+              >
+                <option value="">Select Product...</option>
+                {products.map(p => (
+                  <option key={p.id} value={p.id}>{p.name_en}</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-span-4">
+              <select
+                value={selectedAddVariantId}
+                disabled={!selectedAddProductId}
+                onChange={e => {
+                  setSelectedAddVariantId(e.target.value);
+                  const prod = products.find(p => p.id === selectedAddProductId);
+                  const v = prod?.variants.find((varItem: any) => varItem.id === e.target.value);
+                  if (v) {
+                    setAddPrice((v.variantPrice + v.packagingCharge).toString());
+                  }
+                }}
+                className="w-full border border-border rounded-lg px-2 py-1.5 text-xs bg-background disabled:opacity-50"
+              >
+                <option value="">Select Variant...</option>
+                {selectedAddProductId && products.find(p => p.id === selectedAddProductId)?.variants.map((v: any) => (
+                  <option key={v.id} value={v.id}>{v.size} ({v.packaging})</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-span-2">
+              <input
+                type="number"
+                min={1}
+                value={addQuantity}
+                onChange={e => setAddQuantity(Number(e.target.value))}
+                className="w-full border border-border rounded-lg px-2 py-1.5 text-xs bg-background text-center"
+                placeholder="Qty"
+              />
+            </div>
+            <div className="col-span-2">
+              <input
+                type="number"
+                min={0}
+                value={addPrice}
+                onChange={e => setAddPrice(e.target.value)}
+                className="w-full border border-border rounded-lg px-2 py-1.5 text-xs bg-background text-center font-bold text-primary"
+                placeholder="Price"
+              />
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              if (!selectedAddProductId || !selectedAddVariantId) return;
+              const prod = products.find(p => p.id === selectedAddProductId);
+              const v = prod?.variants.find((varItem: any) => varItem.id === selectedAddVariantId);
+              if (prod && v) {
+                setItems(prev => [
+                  ...prev,
+                  {
+                    productName_en: prod.name_en,
+                    productName_te: prod.name_te || '',
+                    variantSize: v.size,
+                    variantPackaging: v.packaging,
+                    quantity: addQuantity,
+                    price: Number(addPrice) || 0,
+                  }
+                ]);
+                setSelectedAddProductId('');
+                setSelectedAddVariantId('');
+                setAddQuantity(1);
+                setAddPrice('0');
+              }
+            }}
+            disabled={!selectedAddProductId || !selectedAddVariantId}
+            className="w-full py-1 h-8 text-xs border border-primary text-primary hover:bg-primary/10 rounded-xl"
+          >
+            Add Item to Order
+          </Button>
+        </div>
+
+        {/* Admin Notes */}
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Admin Notes</p>
+          <textarea
+            rows={2}
+            className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background resize-none"
+            placeholder="e.g. Offline order taken by call"
+            value={adminNotes}
+            onChange={e => setAdminNotes(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-3 border-t border-border/30 pt-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Fulfillment & Shipping</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Fulfillment Status</label>
+              <select
+                value={status}
+                onChange={e => setStatus(e.target.value)}
+                className="w-full border border-border rounded-lg px-2.5 py-1.5 text-xs bg-background"
+              >
+                <option value="Confirmed">Confirmed (ధృవీకరించబడింది)</option>
+                <option value="Preparing">Preparing (తయారవుతోంది)</option>
+                <option value="Out For Delivery">Out For Delivery (రవాణాలో ఉంది)</option>
+                <option value="Delivered">Delivered (చేరింది)</option>
+                <option value="Cancelled">Cancelled (రద్దు చేయబడింది)</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Payment Status</label>
+              <select
+                value={paymentStatus}
+                onChange={e => setPaymentStatus(e.target.value)}
+                className="w-full border border-border rounded-lg px-2.5 py-1.5 text-xs bg-background"
+              >
+                <option value="Unpaid">Unpaid (చెల్లించలేదు)</option>
+                <option value="Paid">Paid (చెల్లించారు)</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Actual Courier Cost</label>
+              <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">₹</span>
+                <input
+                  type="number"
+                  value={actualShippingCost}
+                  onChange={e => setActualShippingCost(e.target.value)}
+                  className="w-full pl-6 pr-2 py-1.5 border border-border rounded-lg text-xs bg-background"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-muted-foreground block mb-1">Actual Amount Paid</label>
+              <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-primary text-xs font-bold">₹</span>
+                <input
+                  type="number"
+                  value={actualAmountPaid}
+                  onChange={e => setActualAmountPaid(e.target.value)}
+                  placeholder={`Auto (₹${itemsTotal})`}
+                  className="w-full pl-6 pr-2 py-1.5 border border-border rounded-lg text-xs bg-background font-bold text-primary"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-2 pt-2">
+          <Button variant="outline" onClick={onClose} className="flex-1 rounded-xl">Cancel</Button>
+          <Button
+            onClick={() => createMutation.mutate()}
+            disabled={createMutation.isPending || !customerName || !customerPhone || items.length === 0}
+            className="flex-1 bg-primary hover:bg-primary/90 text-white rounded-xl disabled:opacity-50"
+          >
+            {createMutation.isPending ? 'Creating...' : 'Create Order'}
           </Button>
         </div>
       </div>
@@ -345,6 +812,7 @@ export function AdminOrders() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   // Search & Filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -557,9 +1025,17 @@ export function AdminOrders() {
   return (
     <div className="p-6 md:p-8 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="font-headline text-2xl font-bold text-foreground">Orders</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">{orders.length} total · {pendingOrders.length} pending approval</p>
+      <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+        <div>
+          <h1 className="font-headline text-2xl font-bold text-foreground">Orders</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{orders.length} total · {pendingOrders.length} pending approval</p>
+        </div>
+        <Button
+          onClick={() => setCreateModalOpen(true)}
+          className="bg-primary hover:bg-primary/90 text-white rounded-xl flex items-center gap-2"
+        >
+          <Plus className="h-4 w-4" /> Create Manual Order
+        </Button>
       </div>
 
       {/* Tabs */}
@@ -982,6 +1458,7 @@ export function AdminOrders() {
       {/* Modals */}
       {editingOrder && <EditOrderDrawer order={editingOrder} onClose={() => setEditingOrder(null)} />}
       {viewingOrder && <OrderDetailModal order={viewingOrder} onClose={() => setViewingOrder(null)} />}
+      {createModalOpen && <CreateOrderModal onClose={() => setCreateModalOpen(false)} />}
       
       {statusModalOpen && statusModalOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-in fade-in duration-200">
